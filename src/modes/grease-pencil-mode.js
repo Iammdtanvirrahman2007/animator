@@ -99,9 +99,24 @@ function cameraViewTransform(){
   const f=norm(vsub(target,pos)), yaw=Math.atan2(f[0],f[2]), pitch=Math.asin(f[1]);
   return{yaw,pitch,distance:Math.max(100,length3(vsub(target,pos))),target:[...target]};
 }
+function cameraFocal(){
+  return clamp(720*(Number(state.sceneCamera?.lens)||50)/50,260,1800);
+}
 function applyCameraView(){
   const t=cameraViewTransform();
   state.yaw=t.yaw;state.pitch=t.pitch;state.distance=t.distance;state.target=[...t.target];
+  state.focal=cameraFocal();
+}
+function drawCameraViewOverlay(c){
+  if(!state.sceneCamera.view)return;
+  c.save();
+  c.strokeStyle='#ffffff55';c.lineWidth=1;
+  for(const x of [320,640]){c.beginPath();c.moveTo(x,0);c.lineTo(x,540);c.stroke()}
+  for(const y of [180,360]){c.beginPath();c.moveTo(0,y);c.lineTo(960,y);c.stroke()}
+  c.strokeStyle='#ffffff88';c.lineWidth=2;c.strokeRect(10,10,940,520);
+  c.strokeStyle='#ffffff38';c.setLineDash([6,6]);c.strokeRect(72,40,816,460);c.setLineDash([]);
+  c.fillStyle='#ffffffcc';c.font='10px system-ui';c.fillText('CAMERA VIEW  ·  '+Number(state.sceneCamera.lens).toFixed(0)+'mm',18,28);
+  c.restore();
 }
 function selectSceneCamera(x,y){
   const p=project(state.sceneCamera.position);
@@ -113,7 +128,9 @@ function drawSceneCamera(c){
   const f=norm(vsub(target,pos)), upRef=[0,1,0];
   let right=norm(cross(f,upRef)); if(length3(right)<.01)right=[1,0,0];
   const up=norm(cross(right,f));
-  const near=90, far=180, halfH=far*.30, halfW=halfH*1.777;
+  const near=90, far=180;
+  const lens=clamp(Number(cam.lens)||50,12,200), fov=Math.max(.18,2*Math.atan(36/(2*lens)));
+  const halfH=far*Math.tan(fov*.5), halfW=halfH*(960/540);
   const nearC=vadd(pos,vmul(f,near)), farC=vadd(pos,vmul(f,far));
   const nc=[
     vadd(vadd(nearC,vmul(right,-halfW*.5)),vmul(up,halfH*.5)),
@@ -274,7 +291,7 @@ function draw(ctx,S,f,on){
   drawPage(ctx);drawGrid(ctx);drawSceneCamera(ctx);drawCameraPath(ctx);drawOnion(ctx,S,f);
   const ordered=[];S.l.forEach((L,i)=>{if(!L.v)return;for(const s of L.d?.[f]||[])ordered.push({s,i,z:Number.isFinite(+s.z)?+s.z:(Number.isFinite(+L.gpZ)?+L.gpZ:i*45)})});
   ordered.sort((a,b)=>b.z-a.z);for(const q of ordered)drawStroke(ctx,q.s);
-  drawSelection(ctx,S);if(state.edit)drawGizmo(ctx);
+  drawSelection(ctx,S);if(state.edit)drawGizmo(ctx);drawCameraViewOverlay(ctx);
   ctx.fillStyle='#d9d9d9';ctx.font='11px system-ui';ctx.fillText('3D Grease Pencil',14,20);
   ctx.fillStyle='#9fa4aa';ctx.fillText('MMB Orbit · Shift+MMB Pan · Wheel Dolly · G/R/S · X/Y/Z constrain · Tab Edit',14,38);
   const di=layerDepthInfo(S);
@@ -394,6 +411,7 @@ function pointerMove(ctx,e){
       cam.target=vadd(cam.position,vmul(f,Math.max(100,ctx.md.distance)));
     }else if(ctx.md.type==='s'){
       cam.lens=clamp(ctx.md.lens*Math.exp(-dy*.008),12,200);
+      if(state.sceneCamera.view)state.focal=cameraFocal();
     }
     persist(ctx.S);ctx.render();return true;
   }
