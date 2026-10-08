@@ -1,0 +1,1 @@
+export const transformTools={move:{id:'move',shortcut:'G'},rotate:{id:'rotate',shortcut:'R'},scale:{id:'scale',shortcut:'S'}};
