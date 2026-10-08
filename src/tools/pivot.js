@@ -1,0 +1,1 @@
+export const pivotTool={id:'pivot',label:'Pivot',shortcut:'P'};
