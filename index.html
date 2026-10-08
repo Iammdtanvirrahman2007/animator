@@ -169,9 +169,9 @@ input[type=color]{border-color:#505157!important}
 @media(max-width:760px){#mid{grid-template-columns:40px minmax(0,1fr) 176px}#sd{padding-left:8px;padding-right:8px}}
 @media(max-width:480px){#mid{grid-template-columns:34px minmax(0,1fr) 148px}#sd{padding-left:6px;padding-right:6px}#th{gap:4px}}
 </style></head><body><div id="app">
-<header id="hd"><b class="lg">Keyframe</b><span id="ver">0.3</span><div id="modeWrap" title="Blender-style mode selector"><span id="modeIcon">●</span><select id="modeSelect" aria-label="Editor mode"><option value="object">Object Mode</option><option value="draw">Draw Mode</option><option value="edit">Edit Mode</option><option value="animate">Animate Mode</option><option value="camera">Camera Mode</option><option value="mask">Mask Mode</option><option value="grease">Grease Pencil 3D</option></select></div><i></i><button id="bn">New</button><button id="bs">Save</button><button id="bo">Open</button><input id="ld" type="file" accept=".json" hidden><i></i><button id="bu">Undo</button><button id="br">Redo</button><i></i><button id="bp">PNG</button><button id="bw">WebM</button><i></i><button id="bh">Keys ?</button><span id="sx"></span></header>
+<header id="hd"><b class="lg">Keyframe</b><span id="ver">0.3</span><div id="modeWrap" title="Blender-style mode selector"><span id="modeIcon">●</span><select id="modeSelect" aria-label="Editor mode"><option value="object">Object Mode</option><option value="draw">Draw Mode</option><option value="edit">Edit Mode</option><option value="animate">Animate Mode</option><option value="camera">Camera Mode</option><option value="mask">Mask Mode</option><option value="grease">Grease Pencil 3D</option></select></div><i></i><button id="bn">New</button><button id="bs">Save</button><button id="bo">Open</button><input id="ld" type="file" accept=".json" hidden><i></i><button id="bu">Undo</button><button id="br">Redo</button><i></i><button id="bp">PNG</button><button id="bw">WebM</button><button id="bm4" title="Render animation to MP4">MP4</button><i></i><button id="bh">Keys ?</button><span id="sx"></span></header>
 <div id="mid"><nav id="tb"></nav>
-<div id="vp"><canvas id="cv" width="960" height="540"></canvas><pre id="hp" hidden>Space play   ←/→ frame   ↑/↓ prev/next key   Shift+←/→ start/end
+<div id="vp"><canvas id="cv" width="960" height="540"></canvas><pre id="hp" hidden>Space play   ←/→ frame   ↑/↓ prev/next key   Shift+←/→ start/end\nExport: PNG · WebM · MP4
 Object: V select/move stroke · Edit: drag control points · Tab switch mode · Delete selected stroke
 D draw  E erase  L line  B box  O ellipse  P pivot
 Drag preview to move · edge/corner handles resize freely · drag top handle to rotate · wheel / [ ] scale
@@ -412,6 +412,76 @@ async function save(n,b){try{const d=window.claude&&await claude.use('downloads'
 function png(){const c=document.createElement('canvas');c.width=W;c.height=H;draw(c.getContext('2d'),S.f,0);c.toBlob(b=>save('frame-'+S.f+'.png',b))}
 function rec(){if(rc)return;let m;try{m=new MediaRecorder(cv.captureStream(S.fps),{mimeType:'video/webm'})}catch(e){return msg('WebM export is not supported in this browser')}
  const ch=[];m.ondataavailable=e=>ch.push(e.data);m.onstop=()=>{rc=0;ui();save('animation.webm',new Blob(ch,{type:'video/webm'}))};rc=m;go(S.a);m.start();play(true);msg('Recording one pass…')}
+let ffmpegInstance=null,ffmpegLoading=null;
+async function getFFmpeg(){
+ if(ffmpegInstance)return ffmpegInstance;
+ if(ffmpegLoading)return ffmpegLoading;
+ ffmpegLoading=(async()=>{
+  msg('Loading MP4 encoder (~31 MB)…');
+  const [{FFmpeg},{fetchFile,toBlobURL}]=await Promise.all([
+   import('https://esm.sh/@ffmpeg/ffmpeg@0.12.10'),
+   import('https://esm.sh/@ffmpeg/util@0.12.2')
+  ]);
+  const ff=new FFmpeg();
+  const baseURL='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd';
+  await ff.load({
+   coreURL:await toBlobURL(baseURL+'/ffmpeg-core.js','text/javascript'),
+   wasmURL:await toBlobURL(baseURL+'/ffmpeg-core.wasm','application/wasm')
+  });
+  ff._fetchFile=fetchFile;
+  ffmpegInstance=ff;
+  msg('MP4 encoder ready');
+  return ff;
+ })().catch(e=>{ffmpegLoading=null;throw e});
+ return ffmpegLoading;
+}
+async function mp4(){
+ if(rc)return msg('Stop the current recording first');
+ const oldFrame=S.f,oldPlaying=playing;
+ try{
+  const ff=await getFFmpeg();
+  const stream=cv.captureStream(S.fps);
+  const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+   ? 'video/webm;codecs=vp9'
+   : 'video/webm';
+  const m=new MediaRecorder(stream,{mimeType:mime});
+  const ch=[];
+  m.ondataavailable=e=>{if(e.data.size)ch.push(e.data)};
+  const stopped=new Promise((resolve,reject)=>{
+   m.onerror=e=>reject(e.error||new Error('MP4 recording failed'));
+   m.onstop=resolve;
+  });
+  rc=m;go(S.a);play(true);
+  msg('Rendering animation to WebM…');
+  m.start(250);
+  await new Promise(resolve=>{
+   const wait=()=>{
+    if(!playing){resolve();return}
+    requestAnimationFrame(wait)
+   };
+   wait();
+  });
+  if(rc===m){m.stop();await stopped}
+  rc=0;playing=false;ui();
+  if(!ch.length)throw new Error('No video frames were recorded');
+  const webm=new Blob(ch,{type:'video/webm'});
+  await ff.writeFile('animation.webm',await ff._fetchFile(webm));
+  msg('Encoding MP4…');
+  await ff.exec(['-i','animation.webm','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart','-an','animation.mp4']);
+  const data=await ff.readFile('animation.mp4');
+  await ff.deleteFile('animation.webm').catch(()=>{});
+  await ff.deleteFile('animation.mp4').catch(()=>{});
+  await save('animation.mp4',new Blob([data.buffer],{type:'video/mp4'}));
+  msg('MP4 export complete');
+ }catch(e){
+  rc=0;playing=false;S.f=oldFrame;ui();
+  msg('MP4 export failed: '+(e?.message||e));
+ }finally{
+  S.f=oldFrame;
+  if(oldPlaying&&!playing)play(true);
+  else ui();
+ }
+}
 function LL(){ll.innerHTML=S.l.map((L,i)=>`<div class="ly${i==S.i?' on':''}" data-i=${i}><input type=checkbox data-v=${i} ${L.v?'checked':''} title=Visible><span>${esc(L.n)}</span></div>`).reverse().join('')}
 function DS(){const c=ds.getContext('2d'),w=ds.width=ds.clientWidth,h=ds.height=ds.clientHeight,n=S.b-S.a+1,u=(w-104)/n,X=f=>96+(f-S.a+.5)*u;
  c.fillStyle='#1f1f1f';c.fillRect(0,0,w,h);c.fillStyle='#303030';c.fillRect(0,0,w,24);c.font='10px system-ui';c.textBaseline='middle';
@@ -456,7 +526,7 @@ oi.oninput=e=>{S.on=+e.target.value;ui()};bgc.oninput=e=>{S.bg=e.target.value;ui
 fi.onchange=e=>go(+e.target.value);fps.onchange=e=>{S.fps=cl(+e.target.value||24,1,120);ui()};
 fa.onchange=e=>{S.a=cl(Math.round(+e.target.value)||1,1,S.b);S.f=cl(S.f,S.a,S.b);ui()};fb.onchange=e=>{S.b=cl(Math.round(+e.target.value)||48,S.a,999);S.f=cl(S.f,S.a,S.b);ui()};
 bn.onclick=()=>{snap();S=fresh();fit();dirty=true;ui(1);msg('New project — Undo brings the old one back')};
-bs.onclick=()=>save('animation.json',new Blob([JSON.stringify(S)],{type:'application/json'}));bo.onclick=()=>ld.click();bu.onclick=undo;br.onclick=redo;bp.onclick=png;bw.onclick=rec;bh.onclick=()=>hp.hidden=!hp.hidden;
+bs.onclick=()=>save('animation.json',new Blob([JSON.stringify(S)],{type:'application/json'}));bo.onclick=()=>ld.click();bu.onclick=undo;br.onclick=redo;bp.onclick=png;bw.onclick=rec;bm4.onclick=mp4;bh.onclick=()=>hp.hidden=!hp.hidden;
 ld.onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());if(!j.l||!j.l.length)throw 0;snap();S=j;S.i=cl(S.i|0,0,S.l.length-1);S.f=cl(S.f||1,S.a,S.b);dirty=false;ui(1)}catch(x){msg('That is not a Keyframe project file')}e.target.value=''};
 addEventListener('change',e=>e.target.blur());addEventListener('click',e=>{if(e.target.tagName=='BUTTON')e.target.blur()});
 addEventListener('resize',()=>{fit();DS()});
