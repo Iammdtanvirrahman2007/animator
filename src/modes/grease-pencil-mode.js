@@ -100,6 +100,44 @@ function hitStroke(s,x,y){
   return d<16?{index:best,d}:null;
 }
 function selectedStroke(){return state.selected?.s||null}
+function polygonArea(pts){
+  let a=0;for(let i=0;i<pts.length;i++){const p=pts[i],q=pts[(i+1)%pts.length];a+=p[0]*q[1]-q[0]*p[1]}return Math.abs(a)*.5;
+}
+function pointInPolygon(x,y,pts){
+  let inside=false;
+  for(let i=0,j=pts.length-1;i<pts.length;j=i++){
+    const a=pts[i],b=pts[j],hit=((a[1]>y)!==(b[1]>y))&&(x<(b[0]-a[0])*(y-a[1])/((b[1]-a[1])||1e-9)+a[0]);
+    if(hit)inside=!inside;
+  }
+  return inside;
+}
+function fillCandidate(s,x,y){
+  const pts=worldPoints(s).map(project).filter(Boolean).map(p=>[p[0],p[1]]);
+  if(pts.length<3||polygonArea(pts)<8)return null;
+  const end=Math.hypot(pts[0][0]-pts.at(-1)[0],pts[0][1]-pts.at(-1)[1]);
+  if(end>22)return null;
+  return pointInPolygon(x,y,pts)?pts:null;
+}
+function bucketFill(ctx,x,y){
+  const S=ctx.S;let best=null;
+  for(let li=0;li<S.l.length;li++){
+    const L=S.l[li];if(!L.v)continue;
+    for(const s of L.d?.[S.f]||[]){
+      const pts=fillCandidate(s,x,y);if(!pts)continue;
+      const c=strokeCenter(s),z=Math.abs(c[2]);
+      if(!best||pts.length>best.pts.length)best={s,li,pts,z};
+    }
+  }
+  if(!best){ctx.ui?.();return false}
+  ctx.snap?.();
+  best.s.f=true;
+  best.s.fc=ctx.col?.value||best.s.c||'#1b1b1b';
+  best.s.fillRule='bucket';
+  state.selected={s:best.s,li:best.li,h:{index:0,d:0}};
+  state.selectedPoint=0;
+  ctx.ui?.();ctx.render();
+  return true;
+}
 function drawStroke(c,s){
   if(!s.p?.length)return;
   const pts=worldPoints(s).map(project).filter(Boolean);if(!pts.length)return;
