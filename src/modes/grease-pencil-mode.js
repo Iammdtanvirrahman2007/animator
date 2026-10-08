@@ -49,8 +49,8 @@ function unprojectPlane(x,y,z=0){
   const p=vadd(cam.pos,vmul(dir,t));
   return [p[0],p[1],z];
 }
-function worldFromStroke(s,i){
-  const z=Number.isFinite(+s.z)?+s.z:(i*45);
+function worldFromStroke(s){
+  const z=Number.isFinite(+s.z)?+s.z:0;
   return [s.p[0][0]-480,270-s.p[0][1],z];
 }
 function drawGrid(c){
@@ -77,7 +77,7 @@ function drawGrid(c){
 }
 function drawStroke(c,s,i){
   if(!s.p?.length)return;
-  const pts=s.p.map((_,j)=>project(worldFromStroke(s,j))).filter(Boolean);
+  const pts=s.p.map(()=>project(worldFromStroke(s))).filter(Boolean);
   if(!pts.length)return;
   c.beginPath();c.moveTo(pts[0][0],pts[0][1]);
   for(let j=1;j<pts.length;j++)c.lineTo(pts[j][0],pts[j][1]);
