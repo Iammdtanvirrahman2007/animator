@@ -494,14 +494,43 @@ function DS(){const c=ds.getContext('2d'),w=ds.width=ds.clientWidth,h=ds.height=
  S.l.forEach((L,i)=>{const y=24+(S.l.length-1-i)*22;c.fillStyle=i==S.i?'#34404f':'#262626';c.fillRect(0,y,w,21);c.fillStyle=L.v?'#d6d6d6':'#777';c.fillText(L.n.slice(0,14),6,y+11);
   const D=ks(L.d);D.forEach((k,j)=>{const e=D[j+1]??S.b+1;c.fillStyle='#3b5f8a88';c.fillRect(X(k),y+8,Math.max(0,X(e)-X(k)),5);c.fillStyle='#8fb4e3';c.fillRect(X(k)-4,y+5,8,11);if(frameSel.has(frameId(i,k))){c.strokeStyle='#fff';c.lineWidth=1.5;c.strokeRect(X(k)-6,y+3,12,15)}});
   ks(L.k).forEach(k=>{const x=X(k);c.fillStyle='#e87d0d';c.beginPath();c.moveTo(x,y+4);c.lineTo(x+6,y+10.5);c.lineTo(x,y+17);c.lineTo(x-6,y+10.5);c.fill()})});
+  if(mode==='grease'){
+    const cy=24+S.l.length*22;c.fillStyle='#202020';c.fillRect(0,cy,w,21);c.fillStyle='#f0a040';c.fillText('Camera Path',6,cy+11);
+    const pf=S.gp3d?.cameraPathFrames||[];pf.forEach((f,i)=>{const x=X(f);c.fillStyle=(window.GreasePencil3D?.state?.cameraPathSelected===i)?'#fff':'#f0a040';c.beginPath();c.moveTo(x,cy+4);c.lineTo(x+6,cy+10.5);c.lineTo(x,cy+17);c.lineTo(x-6,cy+10.5);c.fill();c.fillStyle='#f0a040';c.fillText(String(f),x+7,cy+11)});
+  }
  const x=X(S.f);c.fillStyle='#4772b3';c.fillRect(x-1,0,2,h);c.fillRect(x-13,2,26,15);c.fillStyle='#fff';c.fillText(S.f,x-6,10)}
+let cameraTimelineDrag=null;
+function cameraPathFrameFromX(x,r,u){return cl(Math.round(S.a+(x-96)/u-.5),S.a,S.b)}
+function ensureCameraTimelineFrames(){
+  if(!S.gp3d)S.gp3d={};
+  const p=S.gp3d.cameraPath||[],f=S.gp3d.cameraPathFrames||[];
+  if(f.length!==p.length)S.gp3d.cameraPathFrames=p.map((_,i)=>Math.round(S.a+(S.b-S.a)*(i/Math.max(1,p.length-1))));
+  return S.gp3d.cameraPathFrames;
+}
 ds.onpointerdown=e=>{ds.setPointerCapture(e.pointerId);const r=ds.getBoundingClientRect(),u=(r.width-104)/(S.b-S.a+1),x=e.clientX-r.left,y=e.clientY-r.top;
  const setFrame=e=>go(S.a+(e.clientX-r.left-96)/u-.5);
+ const cameraY=24+S.l.length*22;
+ if(mode==='grease'&&y>=cameraY&&y<cameraY+22){
+   const pf=ensureCameraTimelineFrames(),hit=pf.map((f,i)=>({i,d:Math.abs(Xframe(f,u)-x)})).sort((a,b)=>a.d-b.d)[0];
+   if(hit&&hit.d<=Math.max(8,u*.6)){
+     if(window.GreasePencil3D?.state)window.GreasePencil3D.state.cameraPathSelected=hit.i;
+     cameraTimelineDrag={index:hit.i,origin:pf[hit.i]};S.f=pf[hit.i];ui();return;
+   }
+   setFrame(e);return;
+ }
  if(y>24){const i=S.l.length-1-Math.floor((y-24)/22);if(S.l[i]){S.i=i;LL();const f=cl(Math.round(S.a+(x-96)/u-.5),S.a,S.b),hit=ks(S.l[i].d).find(k=>Math.abs((96+(k-S.a+.5)*u)-x)<=Math.max(6,u*.45));
   if(hit!=null){selectTimelineFrame(i,hit,e);S.f=hit;timelineDrag={origin:hit};ui()}else{if(!e.shiftKey&&!e.ctrlKey&&!e.metaKey){frameSel.clear();frameAnchor=null}timelineDrag=null;setFrame(e);DS()}
  }}else{timelineDrag=null;setFrame(e)}};
-ds.onpointermove=e=>{if(e.buttons&&timelineDrag)setTimelineFrame(e);else if(e.buttons){const r=ds.getBoundingClientRect(),u=(r.width-104)/(S.b-S.a+1);go(S.a+(e.clientX-r.left-96)/u-.5)}};
-ds.onpointerup=()=>{if(timelineDrag){const delta=S.f-timelineDrag.origin;timelineDrag=null;if(delta)moveFrames(delta);else DS()}};
+function Xframe(f,u){return 96+(f-S.a+.5)*u}
+ds.onpointermove=e=>{
+ if(cameraTimelineDrag){
+   const r=ds.getBoundingClientRect(),u=(r.width-104)/(S.b-S.a+1),pf=ensureCameraTimelineFrames(),i=cameraTimelineDrag.index;
+   const raw=cameraPathFrameFromX(e.clientX-r.left,r,u),prev=i>0?pf[i-1]:S.a-1,next=i<pf.length-1?pf[i+1]:S.b+1;
+   const nf=cl(raw,prev+1,next-1);pf[i]=nf;S.f=nf;dirty=true;DS();R();return;
+ }
+ if(e.buttons&&timelineDrag)setTimelineFrame(e);else if(e.buttons){const r=e.currentTarget.getBoundingClientRect(),u=(r.width-104)/(S.b-S.a+1);go(S.a+(e.clientX-r.left-96)/u-.5)}
+};
+ds.onpointerup=()=>{if(cameraTimelineDrag){cameraTimelineDrag=null;window.GreasePencil3D?.state&& (window.GreasePencil3D.state.cameraPathSelected=window.GreasePencil3D.state.cameraPathSelected);ui(1);return}if(timelineDrag){const delta=S.f-timelineDrag.origin;timelineDrag=null;if(delta)moveFrames(delta);else DS()}};
 function setTimelineFrame(e){const r=ds.getBoundingClientRect(),u=(r.width-104)/(S.b-S.a+1);go(S.a+(e.clientX-r.left-96)/u-.5)}
 const PR=[['x','X',1],['y','Y',1],['r','Rotation°',1],['s','Scale',.05],['o','Opacity',.05]],
 TOOLSETS={
