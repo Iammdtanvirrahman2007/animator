@@ -1,0 +1,1 @@
+export const animateMode={id:'animate',label:'Animate Mode',icon:'◇',tools:[['select','↖','Select animated object'],['pivot','⌖','Set pivot']],help:'Keyframes, timing, playback and onion skin.'};
