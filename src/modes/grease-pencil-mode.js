@@ -145,7 +145,7 @@ function drawStroke(c,s){
   const z=pts.reduce((a,p)=>a+p[2],0)/pts.length;
   c.lineWidth=Math.max(.6,(s.w||1)*Math.max(.3,720/z));c.lineCap=c.lineJoin='round';
   c.strokeStyle=s.c||'#111';c.globalAlpha=Number.isFinite(+s.o)?+s.o:.98;c.stroke();
-  if(s.f&&pts.length>2){c.globalAlpha*=.18;c.fillStyle=s.c||'#111';c.fill()}
+  if(s.f&&pts.length>2){c.save();c.globalAlpha*=Number.isFinite(+s.fo)?+s.fo:.22;c.fillStyle=s.fc||s.c||'#111';c.fill();c.restore()}
 }
 function drawSelection(c,S){
   const s=selectedStroke();if(!s)return;
@@ -249,6 +249,10 @@ function pointerDown(ctx,e){
       return beginTransform(ctx,'g',gh,e);
     }
   }
+  if(ctx.tool==='fill'){
+    bucketFill(ctx,sx,sy);
+    return true;
+  }
   if(ctx.tool==='select'||ctx.tool==='edit'){
     let best=null;
     for(let li=0;li<S.l.length;li++){
@@ -331,6 +335,7 @@ function keydown(ctx,e){
   if(k==='0'&&e.code==='Numpad0'){state.yaw=.35;state.pitch=-.22;persist(ctx.S);ctx.render();return true}
   if(k==='x'||k==='y'||k==='z'){state.drawPlane=k==='x'?'YZ':k==='y'?'XZ':'XY';ctx.ui?.();ctx.render();return true}
   if(k==='tab'){state.edit=!state.edit;ctx.ui?.();ctx.render();return true}
+  if(k==='f'){ctx.tool='fill';ctx.ui?.();ctx.render();return true}
   if(k==='g'||k==='r'||k==='s')return beginTransform(ctx,k,null,e);
   if(k==='delete'||k==='backspace'){
     if(state.edit&&state.selected?.s&&state.selectedPoint>=0){
@@ -344,9 +349,9 @@ function keydown(ctx,e){
 }
 export const greasePencilMode={
   id:'grease',label:'Grease Pencil 3D',icon:'✎3D',
-  tools:[['draw','✎','Draw Grease Pencil stroke'],['select','↖','Select object / stroke'],['edit','◆','Edit Grease Pencil points']],
+  tools:[['draw','✎','Draw Grease Pencil stroke'],['fill','▣','Fill enclosed Grease Pencil region'],['select','↖','Select object / stroke'],['edit','◆','Edit Grease Pencil points']],
   panels:['3D View','Grease Pencil','Layers','Depth'],
-  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Perspective','tab':'Edit/Object','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','shift+d':'Duplicate','delete':'Delete'},
+  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Perspective','tab':'Edit/Object','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','shift+d':'Duplicate','delete':'Delete','f':'Fill bucket'},
   help:'Blender-style 3D Grease Pencil viewport with drawing planes, selection, edit points, transforms, gizmo, depth, onion skin and navigation.',
   enter,exit,pointerDown,pointerMove,pointerUp,wheel,keydown
 };
