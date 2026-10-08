@@ -175,8 +175,8 @@ function drawCameraPath(c){
   c.restore();
 }
 function sortCameraPath(){
-  const a=state.cameraPath.map((p,i)=>({p,f:state.cameraPathFrames[i]??state.a,i})).sort((x,y)=>x.f-y.f);
-  state.cameraPath=a.map(x=>x.p);state.cameraPathFrames=a.map(x=>cl(x.f,state.a,state.b));
+  const a=state.cameraPath.map((p,i)=>({p,f:state.cameraPathFrames[i]??state.a,e:state.cameraPathEase[i]||'ease'})).sort((x,y)=>x.f-y.f);
+  state.cameraPath=a.map(x=>x.p);state.cameraPathFrames=a.map(x=>cl(x.f,state.a,state.b));state.cameraPathEase=a.map(x=>x.e);
 }
 function easeCamera(t,mode){
   if(mode==='linear')return t;
@@ -290,6 +290,21 @@ function drawSelection(c,S){
   for(let i=0;i<pts.length;i++){c.fillStyle=i===state.selectedPoint?'#fff':'#f0a040';c.beginPath();c.arc(pts[i][0],pts[i][1],i===state.selectedPoint?5:3,0,Math.PI*2);c.fill()}
   c.restore();
 }
+function frameSelected(){
+  const s=selectedStroke();
+  if(!s)return false;
+  const center=strokeCenter(s),d=Math.max(220,Math.min(1600,state.distance*.55));
+  state.target=[...center];state.distance=d;
+  persist(window.__gpSceneState||{});return true;
+}
+function frameScene(S){
+  const pts=[];
+  for(const L of S.l||[])for(const a of Object.values(L.d||{}))for(const s of a||[])pts.push(strokeCenter(s));
+  if(!pts.length){state.target=[0,0,0];state.distance=900;return true}
+  const c=pts.reduce((a,p)=>vadd(a,p),[0,0,0]).map(v=>v/pts.length);
+  let radius=160;for(const p of pts)radius=Math.max(radius,length3(vsub(p,c)));
+  state.target=c;state.distance=cl(radius*2.4,260,6000);return true;
+}
 function drawGizmo(c){
   const s=selectedStroke();if(!s)return;
   const center=project(strokeCenter(s));if(!center)return;
@@ -383,8 +398,12 @@ function pointerDown(ctx,e){
   if(state.sceneCamera.view){
     if(e.button===0)return true;
   }
-  if((ctx.tool==='select'||ctx.tool==='edit')&&!state.edit&&selectSceneCamera(sx,sy)){
+  if((ctx.tool==='select'||ctx.tool==='camera')&&!state.edit&&selectSceneCamera(sx,sy)){
     state.sceneCamera.selected=true;
+    if(ctx.tool==='camera'){
+      const cam=state.sceneCamera,cv=camera();
+      ctx.md={t:'cameraTransform',type:'g',x:e.clientX,y:e.clientY,position:[...cam.position],target:[...cam.target],lens:cam.lens,yaw:cameraViewTransform().yaw,pitch:cameraViewTransform().pitch,distance:cameraViewTransform().distance};
+    }
     ctx.ui?.();ctx.render();return true;
   }
   if((ctx.tool==='select'||ctx.tool==='edit')&&state.edit){
@@ -405,9 +424,10 @@ function pointerDown(ctx,e){
     state.cameraPathSelected=n;
     persist(ctx.S);ctx.ui?.();ctx.render();return true;
   }
-  if(ctx.tool==='fill'){
-    bucketFill(ctx,sx,sy);
-    return true;
+  if(ctx.tool==='frame'){
+    if(frameSelected())ctx.render();
+    else frameScene(S);
+    ctx.ui?.();return true;
   }
   if(ctx.tool==='select'||ctx.tool==='edit'){
     let best=null;
@@ -422,6 +442,7 @@ function pointerDown(ctx,e){
     }else if(!e.shiftKey){state.selected=null;state.selectedPoint=-1}
     ctx.ui?.();ctx.render();return true;
   }
+  if(ctx.tool==='orbit'||ctx.tool==='pan'||ctx.tool==='select')return true;
   const L=S.l[S.i];if(!L||!L.v)return true;
   const w=planePoint(sx,sy,state.drawPlane),a=[w[0]+480,270-w[1]];
   if(!(S.f in L.d))L.d[S.f]=[];
@@ -531,15 +552,16 @@ function keydown(ctx,e){
   }
   if(k==='['){moveLayerDepth(ctx,-10);return true}
   if(k===']'){moveLayerDepth(ctx,10);return true}
-  if(k==='x'||k==='y'||k==='z'){state.drawPlane=k==='x'?'YZ':k==='y'?'XZ':'XY';ctx.ui?.();ctx.render();return true}
+
   if(k==='tab'){state.edit=!state.edit;ctx.ui?.();ctx.render();return true}
-  if(k==='f'){ctx.tool='fill';ctx.ui?.();ctx.render();return true}
+  if(k==='f'){if(frameSelected())ctx.render();else frameScene(ctx.S);ctx.ui?.();return true}
   if(k==='c'&&!e.ctrlKey&&!e.metaKey){ctx.tool='cameraPath';ctx.ui?.();ctx.render();return true}
   if(ctx.tool==='cameraPath'&&state.cameraPathSelected>=0&&(k==='arrowleft'||k==='arrowright')&&e.shiftKey){
     const i=state.cameraPathSelected,dir=k==='arrowright'?1:-1,step=e.altKey?10:1,prev=i>0?state.cameraPathFrames[i-1]:state.a,next=i<state.cameraPathFrames.length-1?state.cameraPathFrames[i+1]:state.b;
     state.cameraPathFrames[i]=cl(state.cameraPathFrames[i]+dir*step,prev+1,next-1);persist(ctx.S);ctx.ui?.();ctx.render();return true;
   }
   if(k==='p'&&!e.ctrlKey&&!e.metaKey){state.pageVisible=!state.pageVisible;ctx.ui?.();ctx.render();return true}
+  if(k==='home'){frameScene(ctx.S);ctx.ui?.();ctx.render();return true}
   if(k==='g'||k==='r'||k==='s'){
     if(state.sceneCamera.selected){
       const cam=state.sceneCamera;
@@ -559,11 +581,11 @@ function keydown(ctx,e){
   return false;
 }
 export const greasePencilMode={
-  id:'grease',label:'Grease Pencil 3D',icon:'✎3D',
-  tools:[['draw','✎','Draw Grease Pencil stroke'],['fill','▣','Fill enclosed Grease Pencil region'],['cameraPath','⌁','Draw 3D camera path'],['select','↖','Select object / stroke'],['edit','◆','Edit Grease Pencil points']],
-  panels:['3D View','Grease Pencil','Layers','Depth'],
-  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Camera/Perspective','tab':'Edit/Object','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','[':'Layer depth back',']':'Layer depth front','shift+d':'Duplicate','delete':'Delete','f':'Fill bucket','c':'Camera path','shift+←/→':'Path timing','alt+shift+←/→':'10-frame timing','p':'Show/hide 2D page'},
-  help:'Blender-style 3D Grease Pencil viewport with per-layer depth, camera-relative parallax and animated camera paths. Each path point has a frame; select a point and use Shift+Left/Right to increase or decrease the gap.',
+  id:'grease',label:'Grease Pencil 3D',icon:'3D',
+  tools:[['select','↖','Select 2D scene object / layer'],['camera','▣','Select and drag the 3D scene camera'],['cameraPath','⌁','Create and edit animated camera path'],['frame','⌗','Frame selected object or whole scene'],['orbit','✥','3D orbit navigation'],['pan','✥','3D pan navigation']],
+  panels:['3D View','Scene Camera','Camera Path','Layers','Depth'],
+  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Camera View','tab':'Object/Edit','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','[':'Layer depth back',']':'Layer depth front','shift+d':'Duplicate','delete':'Delete','f':'Frame selected','home':'Frame scene','c':'Camera path','shift+←/→':'Path timing','alt+shift+←/→':'10-frame timing','p':'Show/hide 2D page'},
+  help:'Blender-style 3D scene workspace for camera animation, object transforms, depth, framing, orbit/pan navigation and camera paths. Drawing tools are intentionally disabled here.';
   enter,exit,pointerDown,pointerMove,pointerUp,wheel,keydown
 };
 window.GreasePencil3D={draw,pointerDown,pointerMove,pointerUp,wheel,keydown,ensure,state};
