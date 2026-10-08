@@ -399,4 +399,4 @@ function ui(full){if(full)LL();R();DS();const L=S.l[S.i],A=document.activeElemen
  clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('keyframe.project.v3',JSON.stringify(S))}catch(e){}},600);sx.textContent=(dirty?'● Unsaved changes':'✓ Saved locally')}
 try{S=JSON.parse(localStorage.getItem('keyframe.project.v3')||localStorage.kf);if(!S.l.length)throw 0}catch(e){S=fresh()}
 S.i=cl(S.i|0,0,S.l.length-1);fit();ui(1);
-</script></body></html>
+</script><script type="module" src="./src/main.js"></script></body></html>
