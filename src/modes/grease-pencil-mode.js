@@ -190,13 +190,14 @@ function pointerDown(ctx,e){
   if(e.button!==0)return false;
   const S=ctx.S,L=S.l[S.i];if(!L||!L.v)return true;
   const [sx,sy]=screen(e);
-  if(ctx.tool==='select'){
+  if(ctx.tool==='select'||ctx.tool==='edit'){
     let best=null;
     for(let li=0;li<S.l.length;li++){
       const layer=S.l[li];if(!layer.v)continue;
       for(const s of layer.d?.[S.f]||[]){const h=hitStroke(s,sx,sy);if(h&&(!best||h.d<best.h.d))best={s,li,h}}
     }
     state.selected=best;state.selectedPoint=best?.h.index??-1;
+    if(ctx.tool==='edit'&&best){ctx.md={t:'gpPoint',s:best.s,index:best.h.index};}
     ctx.ui?.();ctx.render();return true;
   }
   const z=Number.isFinite(+L.gpZ)?+L.gpZ:S.i*45;
@@ -220,19 +221,26 @@ function pointerMove(ctx,e){
     if(t.type==='s'){state.distance=clamp(t.distance*Math.exp(dy*.006),120,5000);}
     persist(ctx.S);ctx.render();return true;
   }
-  if(ctx.md.t==='gpOrbit'){
+  if(ctx.md?.t==='gpPoint'&&state.selected?.s){
+    const [sx,sy]=screen(e),w=planePoint(sx,sy,state.selected.s.plane||state.drawPlane);
+    state.selected.s.gp3[state.selectedPoint]=w;
+    const a=[w[0]+480,270-w[1]];
+    if(state.selected.s.p[state.selectedPoint])state.selected.s.p[state.selectedPoint]=a;
+    persist(ctx.S);ctx.render();return true;
+  }
+  if(ctx.md?.t==='gpOrbit'){
     state.yaw=ctx.md.yaw-(e.clientX-ctx.md.x)*.008;
     state.pitch=clamp(ctx.md.pitch+(e.clientY-ctx.md.y)*.006,-1.45,1.45);
     persist(ctx.S);ctx.render();return true;
   }
-  if(ctx.md.t==='gpPan'){
+  if(ctx.md?.t==='gpPan'){
     const dx=(e.clientX-ctx.md.x)/Math.max(.1,ctx.S.gp3d?.distance/720||1);
     const dy=(e.clientY-ctx.md.y)/Math.max(.1,ctx.S.gp3d?.distance/720||1);
     const cam=camera();
     state.target=vadd(ctx.md.target,vadd(vmul(cam.right,-dx),vmul(cam.up,dy)));
     persist(ctx.S);ctx.render();return true;
   }
-  if(ctx.md.t==='gpDraw'){
+  if(ctx.md?.t==='gpDraw'){
     const [sx,sy]=screen(e),w=planePoint(sx,sy,ctx.md.s.plane||state.drawPlane),a=[w[0]+480,270-w[1]];
     const p=ctx.md.s.p,last=p[p.length-1],gp=ctx.md.s.gp3;
     if(Math.hypot(a[0]-last[0],a[1]-last[1])>1.2){p.push(a);gp.push(w);}
