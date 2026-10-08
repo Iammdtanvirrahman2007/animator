@@ -1,0 +1,1 @@
+export const editMode={id:'edit',label:'Edit Mode',icon:'◆',tools:[['select','↖','Edit stroke points'],['pivot','⌖','Set pivot']],help:'Edit individual stroke control points.'};
