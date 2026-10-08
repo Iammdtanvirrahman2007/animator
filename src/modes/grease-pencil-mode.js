@@ -528,7 +528,14 @@ function pointerUp(ctx){
   if(ctx.md)ctx.md=null;return !!ctx.md;
 }
 function wheel(ctx,e){
-  e.preventDefault();state.distance=clamp(state.distance*(e.deltaY>0?1.1:.9),100,6000);persist(ctx.S);ctx.render();return true;
+  if(e?.cancelable)e.preventDefault();
+  const delta=Number(e?.deltaY)||0;
+  if(!delta)return true;
+  const factor=Math.exp(clamp(delta,-240,240)*0.0015);
+  state.distance=clamp(state.distance*factor,50,10000);
+  persist(ctx.S);
+  ctx.render();
+  return true;
 }
 function moveLayerDepth(ctx,delta){
   const S=ctx.S,li=state.selected?.li??S.i,L=S.l[li];
