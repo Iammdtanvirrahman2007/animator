@@ -10,6 +10,8 @@ const norm=a=>{const n=length3(a)||1;return vmul(a,1/n)};
 const state={
   yaw:.35,pitch:-.22,distance:900,target:[0,0,0],
   focal:720,grid:80,drawPlane:'XY',
+  pageVisible:true,pageWidth:960,pageHeight:540,pageDepth:0,
+  cameraPath:[],cameraPathSelected:-1,cameraPathDrawing:false,
   selected:null,selectedPoint:-1,edit:false,
   transform:null,drag:null,gizmoSize:70,snap:.5
 };
@@ -69,6 +71,42 @@ function worldPoints(s){
 function strokeCenter(s){
   const pts=worldPoints(s);if(!pts.length)return[0,0,0];
   return pts.reduce((a,p)=>vadd(a,p),[0,0,0]).map(v=>v/pts.length);
+}
+function drawPage(c){
+  if(!state.pageVisible)return;
+  const z=state.pageDepth,w=state.pageWidth/2,h=state.pageHeight/2;
+  const corners=[[-w,-h,z],[w,-h,z],[w,h,z],[-w,h,z]];
+  const p=corners.map(project);
+  if(p.some(x=>!x))return;
+  c.save();
+  c.fillStyle='#fbfaf7';
+  c.globalAlpha=.88;
+  c.beginPath();c.moveTo(p[0][0],p[0][1]);for(let i=1;i<p.length;i++)c.lineTo(p[i][0],p[i][1]);c.closePath();c.fill();
+  c.globalAlpha=.55;c.strokeStyle='#7b7d80';c.lineWidth=1.5;
+  c.beginPath();c.moveTo(p[0][0],p[0][1]);for(let i=1;i<p.length;i++)c.lineTo(p[i][0],p[i][1]);c.closePath();c.stroke();
+  c.globalAlpha=.65;c.fillStyle='#555';c.font='10px system-ui';
+  const label=project([0,-h+18,z]);
+  if(label)c.fillText('2D ANIMATION PAGE',label[0]-58,label[1]);
+  c.restore();
+}
+function drawCameraPath(c){
+  if(state.cameraPath.length<1)return;
+  const pts=state.cameraPath.map(project);
+  c.save();c.lineCap='round';c.lineJoin='round';
+  c.strokeStyle='#f0a040';c.lineWidth=3;
+  c.setLineDash([8,5]);
+  c.beginPath();
+  let started=false;
+  for(const p of pts){if(!p)continue;if(!started){c.moveTo(p[0],p[1]);started=true}else c.lineTo(p[0],p[1])}
+  if(started)c.stroke();
+  c.setLineDash([]);
+  pts.forEach((p,i)=>{
+    if(!p)return;
+    c.fillStyle=i===state.cameraPathSelected?'#fff':'#f0a040';
+    c.strokeStyle='#222';c.lineWidth=2;c.beginPath();c.arc(p[0],p[1],i===state.cameraPathSelected?7:5,0,Math.PI*2);c.fill();c.stroke();
+    c.fillStyle='#f0a040';c.font='9px system-ui';c.fillText(String(i+1),p[0]+7,p[1]-7);
+  });
+  c.restore();
 }
 function drawGrid(c){
   c.save();c.lineWidth=1;
@@ -183,7 +221,7 @@ function drawOnion(c,S,f){
 }
 function draw(ctx,S,f,on){
   ensure(S);ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.fillStyle='#202124';ctx.fillRect(0,0,960,540);
-  drawGrid(ctx);drawOnion(ctx,S,f);
+  drawPage(ctx);drawGrid(ctx);drawCameraPath(ctx);drawOnion(ctx,S,f);
   const ordered=[];S.l.forEach((L,i)=>{if(!L.v)return;for(const s of L.d?.[f]||[])ordered.push({s,i,z:Number.isFinite(+s.z)?+s.z:(Number.isFinite(+L.gpZ)?+L.gpZ:i*45)})});
   ordered.sort((a,b)=>b.z-a.z);for(const q of ordered)drawStroke(ctx,q.s);
   drawSelection(ctx,S);if(state.edit)drawGizmo(ctx);
@@ -248,6 +286,15 @@ function pointerDown(ctx,e){
       if(gh==='center')return beginTransform(ctx,'g',null,e);
       return beginTransform(ctx,'g',gh,e);
     }
+  }
+  if(ctx.tool==='cameraPath'){
+    const w=planePoint(sx,sy,'XY',0);
+    if(e.shiftKey){
+      state.cameraPath=[];
+    }
+    state.cameraPath.push(w);
+    state.cameraPathSelected=state.cameraPath.length-1;
+    persist(ctx.S);ctx.ui?.();ctx.render();return true;
   }
   if(ctx.tool==='fill'){
     bucketFill(ctx,sx,sy);
@@ -336,6 +383,8 @@ function keydown(ctx,e){
   if(k==='x'||k==='y'||k==='z'){state.drawPlane=k==='x'?'YZ':k==='y'?'XZ':'XY';ctx.ui?.();ctx.render();return true}
   if(k==='tab'){state.edit=!state.edit;ctx.ui?.();ctx.render();return true}
   if(k==='f'){ctx.tool='fill';ctx.ui?.();ctx.render();return true}
+  if(k==='c'&&!e.ctrlKey&&!e.metaKey){ctx.tool='cameraPath';ctx.ui?.();ctx.render();return true}
+  if(k==='p'&&!e.ctrlKey&&!e.metaKey){state.pageVisible=!state.pageVisible;ctx.ui?.();ctx.render();return true}
   if(k==='g'||k==='r'||k==='s')return beginTransform(ctx,k,null,e);
   if(k==='delete'||k==='backspace'){
     if(state.edit&&state.selected?.s&&state.selectedPoint>=0){
@@ -349,9 +398,9 @@ function keydown(ctx,e){
 }
 export const greasePencilMode={
   id:'grease',label:'Grease Pencil 3D',icon:'✎3D',
-  tools:[['draw','✎','Draw Grease Pencil stroke'],['fill','▣','Fill enclosed Grease Pencil region'],['select','↖','Select object / stroke'],['edit','◆','Edit Grease Pencil points']],
+  tools:[['draw','✎','Draw Grease Pencil stroke'],['fill','▣','Fill enclosed Grease Pencil region'],['cameraPath','⌁','Draw 3D camera path'],['select','↖','Select object / stroke'],['edit','◆','Edit Grease Pencil points']],
   panels:['3D View','Grease Pencil','Layers','Depth'],
-  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Perspective','tab':'Edit/Object','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','shift+d':'Duplicate','delete':'Delete','f':'Fill bucket'},
+  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Perspective','tab':'Edit/Object','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','shift+d':'Duplicate','delete':'Delete','f':'Fill bucket','c':'Camera path','p':'Show/hide 2D page'},
   help:'Blender-style 3D Grease Pencil viewport with drawing planes, selection, edit points, transforms, gizmo, depth, onion skin and navigation.',
   enter,exit,pointerDown,pointerMove,pointerUp,wheel,keydown
 };
