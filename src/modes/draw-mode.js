@@ -1,0 +1,1 @@
+export const drawMode={id:'draw',label:'Draw Mode',icon:'✎',tools:[['draw','✎','Brush'],['erase','⌫','Eraser'],['line','╱','Line'],['box','▭','Rectangle'],['oval','◯','Ellipse']],help:'Create and erase drawing strokes.'};
