@@ -443,6 +443,12 @@ function pointerDown(ctx,e){
     ctx.md={t:'gpPan',x:e.clientX,y:e.clientY,target:[...state.target]};
     return true;
   }
+  if(['cameraMove','cameraRotate','cameraFocus'].includes(ctx.tool)){
+    const cam=state.sceneCamera;
+    state.sceneCamera.selected=true;
+    ctx.md={t:'cameraControl',mode:ctx.tool,x:e.clientX,y:e.clientY,position:[...cam.position],target:[...cam.target],lens:cam.lens,yaw:cameraViewTransform().yaw,pitch:cameraViewTransform().pitch,distance:cameraViewTransform().distance};
+    ctx.ui?.();return true;
+  }
   const S=ctx.S,[sx,sy]=screen(e);
   if(state.sceneCamera.view){
     if(e.button===0)return true;
@@ -506,16 +512,23 @@ function pointerDown(ctx,e){
   ctx.md={t:'gpDraw',L,s};ctx.render();return true;
 }
 function pointerMove(ctx,e){
-  if(state.sceneCamera.selected&&ctx.md?.t==='cameraTransform'){
+  if(state.sceneCamera.selected&&(ctx.md?.t==='cameraTransform'||ctx.md?.t==='cameraControl')){
     const cam=state.sceneCamera,dx=e.clientX-ctx.md.x,dy=e.clientY-ctx.md.y;
-    if(ctx.md.type==='g'){
+    const control=ctx.md.t==='cameraControl'?ctx.md.mode:null;
+    const type=control==='cameraMove'?'g':control==='cameraRotate'?'r':control==='cameraFocus'?'focus':ctx.md.type;
+    if(type==='focus'){
+      const view=camera();
+      const shift=vadd(vmul(view.right,dx*.8),vmul(view.up,-dy*.8));
+      cam.target=vadd(ctx.md.target,shift);
+      cam.position=[...ctx.md.position];
+    }else if(type==='g'){
       const v=camera();const delta=vadd(vmul(v.right,dx*.8),vmul(v.up,-dy*.8));
       cam.position=vadd(ctx.md.position,delta);cam.target=vadd(ctx.md.target,delta);
-    }else if(ctx.md.type==='r'){
+    }else if(type==='r'){
       const yaw=ctx.md.yaw-dx*.008,pitch=clamp(ctx.md.pitch+dy*.006,-1.45,1.45);
       const f=[Math.cos(pitch)*Math.sin(yaw),Math.sin(pitch),Math.cos(pitch)*Math.cos(yaw)];
       cam.target=vadd(cam.position,vmul(f,Math.max(100,ctx.md.distance)));
-    }else if(ctx.md.type==='s'){
+    }else if(type==='s'){
       cam.lens=clamp(ctx.md.lens*Math.exp(-dy*.008),12,200);
       if(state.sceneCamera.view)state.focal=cameraFocal();
     }
@@ -645,7 +658,7 @@ function keydown(ctx,e){
 }
 export const greasePencilMode={
   id:'grease',label:'Grease Pencil 3D',icon:'3D',
-  tools:[['select','↖','Select 2D scene object / layer'],['camera','▣','Place / select / drag the 3D scene camera'],['cameraPath','⌁','Create and edit animated camera path'],['frame','⌗','Frame selected object or whole scene'],['orbit','✥','3D orbit navigation'],['pan','✥','3D pan navigation']],
+  tools:[['select','↖','Select scene object / camera'],['camera','▣','Click to place camera; drag camera to move'],['cameraMove','✥','Camera Move: drag to translate camera and target'],['cameraRotate','↻','Camera Rotate: drag left/right and up/down to aim'],['cameraFocus','⊙','Camera Focus: drag to move the focus target'],['cameraPath','⌁','Create and edit animated camera path'],['frame','⌗','Frame selected object or whole scene'],['orbit','✥','3D orbit navigation'],['pan','✥','3D pan navigation']],
   panels:['3D View','Scene Camera','Camera Path','Layers','Depth'],
   shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Camera View','ctrl+alt+numpad0':'Align Camera to View','tab':'Object/Edit','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','[':'Layer depth back',']':'Layer depth front','shift+d':'Duplicate','delete':'Delete','f':'Frame selected','home':'Frame scene','c':'Camera path','shift+←/→':'Path timing','alt+shift+←/→':'10-frame timing','p':'Show/hide 2D page'},
   help:'Blender-style 3D scene workspace for camera animation, object transforms, depth, framing, orbit/pan navigation and camera paths. Drawing tools are intentionally disabled here.',
