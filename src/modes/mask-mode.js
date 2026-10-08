@@ -1,0 +1,1 @@
+export const maskMode={id:'mask',label:'Mask Mode',icon:'▤',tools:[['draw','✎','Draw mask'],['erase','⌫','Erase mask'],['box','▭','Rectangle mask'],['oval','◯','Ellipse mask']],help:'Mask workspace reserved for non-destructive masking.'};
