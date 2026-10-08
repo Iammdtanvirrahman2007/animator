@@ -374,7 +374,7 @@ function drawOnion(c,S,f){
 function draw(ctx,S,f,on){
   ensure(S);
   if(state.cameraPath.length>0&&!state.sceneCamera.selected){sampleCameraPath(f);if(state.sceneCamera.view)applyCameraView();}ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.fillStyle='#202124';ctx.fillRect(0,0,960,540);
-  if(state.sceneCamera.view)drawPage(ctx);drawGrid(ctx);drawSceneCamera(ctx);drawCameraPath(ctx);drawOnion(ctx,S,f);
+  drawPage(ctx);drawGrid(ctx);drawSceneCamera(ctx);drawCameraPath(ctx);drawOnion(ctx,S,f);
   const ordered=[];S.l.forEach((L,i)=>{if(!L.v)return;for(const s of L.d?.[f]||[])ordered.push({s,i,z:Number.isFinite(+s.z)?+s.z:(Number.isFinite(+L.gpZ)?+L.gpZ:i*45)})});
   ordered.sort((a,b)=>b.z-a.z);for(const q of ordered)drawStroke(ctx,q.s);
   drawSelection(ctx,S);if(state.edit)drawGizmo(ctx);drawCameraViewOverlay(ctx);
