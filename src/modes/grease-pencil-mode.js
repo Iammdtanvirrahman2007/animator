@@ -508,7 +508,7 @@ export const greasePencilMode={
   id:'grease',label:'Grease Pencil 3D',icon:'✎3D',
   tools:[['draw','✎','Draw Grease Pencil stroke'],['fill','▣','Fill enclosed Grease Pencil region'],['cameraPath','⌁','Draw 3D camera path'],['select','↖','Select object / stroke'],['edit','◆','Edit Grease Pencil points']],
   panels:['3D View','Grease Pencil','Layers','Depth'],
-  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Camera/Perspective','tab':'Edit/Object','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','[':'Layer depth back',' ]':'Layer depth front','shift+d':'Duplicate','delete':'Delete','f':'Fill bucket','c':'Camera path','p':'Show/hide 2D page'},
+  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Camera/Perspective','tab':'Edit/Object','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','[':'Layer depth back',']':'Layer depth front','shift+d':'Duplicate','delete':'Delete','f':'Fill bucket','c':'Camera path','p':'Show/hide 2D page'},
   help:'Blender-style 3D Grease Pencil viewport with real per-layer world depth, camera-relative parallax, drawing planes, selection, edit points, transforms, gizmo, onion skin and navigation. Use [ ] to move the active layer backward/forward on Z.',
   enter,exit,pointerDown,pointerMove,pointerUp,wheel,keydown
 };
