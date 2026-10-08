@@ -1,0 +1,1 @@
+export const objectMode={id:'object',label:'Object Mode',icon:'●',tools:[['select','↖','Select / move object'],['pivot','⌖','Set pivot']],help:'Select, move, rotate and scale objects.'};
