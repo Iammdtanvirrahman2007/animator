@@ -270,12 +270,12 @@ vp.onpointermove=e=>{const p=pt(e);ms=p;if(mo){mv(p);return}if(!md&&(mode==='edi
  if(md.t=='pan'){view.x=md.vx+e.clientX-md.x;view.y=md.vy+e.clientY-md.y;V();return}
  if(md.t=='erase'){er(e);return}
  if(mode==='draw'&&window.KeyframeModes?.draw?.pointerMove){
- window.KeyframeModes.draw.pointerMove({
+ const handled=window.KeyframeModes.draw.pointerMove({
   S,pt,loc,dr,shape,R,er,tool,
   get md(){return md},
   get pendingShape(){return pendingShape},set pendingShape(v){pendingShape=v}
  },e);
- return
+ if(handled)return
 }
  if(md.t=='objectMove'&&mode==='object'&&window.KeyframeModes?.object?.pointerMove){window.KeyframeModes.object.pointerMove({S,pt,loc,R,get md(){return md},set md(v){md=v},snap,ui},e);return}
  if(md.t=='objectMove'||md.t=='editPoint'){const q=loc(md.L,md.f,p[0],p[1]),dx=q[0]-md.last[0],dy=q[1]-md.last[1];if((dx||dy)&&!md.changed){snap();md.changed=true}if(md.t==='objectMove'){for(const v of md.s.p){v[0]+=dx;v[1]+=dy}}else{md.s.p[md.index][0]+=dx;md.s.p[md.index][1]+=dy}md.last=q;R();return}
@@ -287,12 +287,12 @@ vp.onpointermove=e=>{const p=pt(e);ms=p;if(mo){mv(p);return}if(!md&&(mode==='edi
 vp.onpointerup=()=>{if(md&&md.t=='draw'){const p=md.s.p;for(let k=0;k<+sm.value;k++)for(let i=1;i<p.length-1;i++)p[i]=[(p[i-1][0]+p[i][0]*2+p[i+1][0])/4,(p[i-1][1]+p[i][1]*2+p[i+1][1])/4]}
  if(md&&['line','box','oval'].includes(md.t)){pendingShape={before:md.before,L:md.L,s:md.s,f:md.f};md=null;vp.classList.remove('cursor-grabbing');vp.classList.add('cursor-grab');R();msg('Drag to reposition · Enter to confirm · Esc to cancel');return}
  if(mode==='draw'&&window.KeyframeModes?.draw?.pointerUp){
- window.KeyframeModes.draw.pointerUp({
+ const handled=window.KeyframeModes.draw.pointerUp({
   get md(){return md},set md(v){md=v},
   get pendingShape(){return pendingShape},set pendingShape(v){pendingShape=v},
   ui,sm,vp,R,msg
  });
- return
+ if(handled)return
 }
  if(md?.t==='objectMove'&&mode==='object'&&window.KeyframeModes?.object?.pointerUp){window.KeyframeModes.object.pointerUp({ui,get md(){return md},set md(v){md=v}});return}
  const was=md&&md.t!='pan',wasPendingMove=md&&md.t=='pendingMove',wasPendingTransform=md&&['pendingScale','pendingRotate'].includes(md.t);md=null;if(wasPendingMove||wasPendingTransform){vp.classList.remove('cursor-grabbing','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');vp.classList.add('cursor-grab')}if(was)ui()};
