@@ -408,7 +408,7 @@ function addL(){snap();S.l.splice(S.i+1,0,mk('Layer '+(S.l.length+1)));S.i++;ui(
 function delL(){if(S.l.length<2)return msg('Keep at least one layer');snap();S.l.splice(S.i,1);S.i=Math.max(0,S.i-1);ui(1)}
 function mvL(d){const j=S.i+d;if(j<0||j>=S.l.length)return;snap();[S.l[S.i],S.l[j]]=[S.l[j],S.l[S.i]];S.i=j;ui(1)}
 const dl=(n,b)=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
-async async function save(n,b){try{const d=window.claude&&await claude.use('downloads');if(d){await d.save({filename:n,data:b});msg('Saved '+n)}else dl(n,b);dirty=false;ui()}catch(e){if(!e||e.code!='declined')msg('Save failed: '+((e&&e.message)||e))}}
+async function save(n,b){try{const d=window.claude&&await claude.use('downloads');if(d){await d.save({filename:n,data:b});msg('Saved '+n)}else dl(n,b);dirty=false;ui()}catch(e){if(!e||e.code!='declined')msg('Save failed: '+((e&&e.message)||e))}}
 function png(){const c=document.createElement('canvas');c.width=W;c.height=H;draw(c.getContext('2d'),S.f,0);c.toBlob(b=>save('frame-'+S.f+'.png',b))}
 function rec(){if(rc)return;let m;try{m=new MediaRecorder(cv.captureStream(S.fps),{mimeType:'video/webm'})}catch(e){return msg('WebM export is not supported in this browser')}
  const ch=[];m.ondataavailable=e=>ch.push(e.data);m.onstop=()=>{rc=0;ui();save('animation.webm',new Blob(ch,{type:'video/webm'}))};rc=m;go(S.a);m.start();play(true);msg('Recording one pass…')}
