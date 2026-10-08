@@ -1,0 +1,1 @@
+export const brushTool={id:'draw',label:'Brush',shortcut:'D'};
