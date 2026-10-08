@@ -139,10 +139,10 @@ function selectSceneCamera(x,y){
 }
 function placeCameraAtViewport(S,sx,sy){
   const hit=planePoint(sx,sy,'XY',state.target[2]);
-  const forward=norm(vsub(state.target,hit));
+  const view=camera();
   const distance=Math.max(180,state.distance*.22);
-  state.sceneCamera.position=vsub(hit,vmul(forward,distance));
-  state.sceneCamera.target=[...state.target];
+  state.sceneCamera.position=vsub(hit,vmul(view.forward,distance));
+  state.sceneCamera.target=[...hit];
   state.sceneCamera.selected=true;
   state.sceneCamera.view=false;
   persist(S);
@@ -605,13 +605,13 @@ function keydown(ctx,e){
   if(k==='1'&&e.code==='Numpad1'){state.yaw=0;state.pitch=0;persist(ctx.S);ctx.render();return true}
   if(k==='3'&&e.code==='Numpad3'){state.yaw=Math.PI/2;state.pitch=0;persist(ctx.S);ctx.render();return true}
   if(k==='7'&&e.code==='Numpad7'){state.yaw=0;state.pitch=Math.PI/2-.001;persist(ctx.S);ctx.render();return true}
+  if(k==='0'&&e.code==='Numpad0'&&e.ctrlKey&&e.altKey){
+    alignCameraToView(ctx.S);ctx.render();ctx.ui?.();return true
+  }
   if(k==='0'&&e.code==='Numpad0'){
     state.sceneCamera.view=!state.sceneCamera.view;
     if(state.sceneCamera.view){applyCameraView()}else{state.yaw=.35;state.pitch=-.22}
     persist(ctx.S);ctx.render();return true
-  }
-  if(k==='0'&&e.code==='Numpad0'&&e.ctrlKey&&e.altKey){
-    alignCameraToView(ctx.S);ctx.render();ctx.ui?.();return true
   }
   if(k==='['){moveLayerDepth(ctx,-10);return true}
   if(k===']'){moveLayerDepth(ctx,10);return true}
