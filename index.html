@@ -256,7 +256,7 @@ function snap(){hist.push(JSON.stringify(S));if(hist.length>80)hist.shift();fut=
 function undo(){if(!hist.length)return;fut.push(JSON.stringify(S));const f=S.f;S=JSON.parse(hist.pop());S.f=cl(f,S.a,S.b);ui(1)}
 function redo(){if(!fut.length)return;hist.push(JSON.stringify(S));const f=S.f;S=JSON.parse(fut.pop());S.f=cl(f,S.a,S.b);ui(1)}
 vp.onpointerdown=e=>{vp.setPointerCapture(e.pointerId);
- if(mode==='grease'&&window.GreasePencil3D?.pointerDown){const handled=window.GreasePencil3D.pointerDown({S,snap,render:R,ui,col,sz,fl,get md(){return md},set md(v){md=v}},e);if(handled)return}
+ if(mode==='grease'&&window.GreasePencil3D?.pointerDown){const handled=window.GreasePencil3D.pointerDown({S,snap,render:R,ui,col,sz,fl,tool,get md(){return md},set md(v){md=v}},e);if(handled)return}
  if(mode==='camera'&&window.KeyframeModes?.camera?.pointerDown){
   const handled=window.KeyframeModes.camera.pointerDown({
    camera:S.camera,
@@ -295,7 +295,7 @@ vp.onpointerdown=e=>{vp.setPointerCapture(e.pointerId);
  if(!(f in L.d))L.d[f]=ad.checked?clone(dr(L,f)):[];
  const a=loc(L,f,p[0],p[1]),s={c:col.value,w:+sz.value/ev(L,f).s,f:fl.checked,p:[a]};L.d[f].push(s);md={t:tool,s,L,f,a,before};R()};
 vp.onpointermove=e=>{const p=pt(e);ms=p;
- if(mode==='grease'&&window.GreasePencil3D?.pointerMove){const handled=window.GreasePencil3D.pointerMove({S,render:R,ui,get md(){return md},set md(v){md=v}},e);if(handled)return}
+ if(mode==='grease'&&window.GreasePencil3D?.pointerMove){const handled=window.GreasePencil3D.pointerMove({S,render:R,ui,tool,get md(){return md},set md(v){md=v}},e);if(handled)return}
  if(mode==='camera'&&window.KeyframeModes?.camera?.pointerMove){
   const handled=window.KeyframeModes.camera.pointerMove({camera:S.camera,screen:e=>[e.clientX,e.clientY],get md(){return md},set md(v){md=v},render:R,ui},e);
   if(handled)return;
@@ -324,7 +324,7 @@ vp.onpointermove=e=>{const p=pt(e);ms=p;
  if(md.t=='pendingRotate'){const q=loc(md.L,pendingShape.f,p[0],p[1]),a=Math.atan2(q[1]-md.cy,q[0]-md.cx)-md.start,c=Math.cos(a),s=Math.sin(a);pendingShape.s.p=md.s.map(v=>[md.cx+(v[0]-md.cx)*c-(v[1]-md.cy)*s,md.cy+(v[0]-md.cx)*s+(v[1]-md.cy)*c]);R();return}
  const{s,L,f,a}=md,b=loc(L,f,p[0],p[1]);
  if(md.t=='draw'){const q=s.p[s.p.length-1];if(Math.hypot(b[0]-q[0],b[1]-q[1])>1.5)s.p.push(b)}else s.p=shape(md.t,a,b);R()};
-vp.onpointerup=()=>{if(mode==='grease'&&window.GreasePencil3D?.pointerUp){const handled=window.GreasePencil3D.pointerUp({S,render:R,ui,get md(){return md},set md(v){md=v}},e);if(handled)return}
+vp.onpointerup=()=>{if(mode==='grease'&&window.GreasePencil3D?.pointerUp){const handled=window.GreasePencil3D.pointerUp({S,render:R,ui,tool,get md(){return md},set md(v){md=v}},e);if(handled)return}
  if(mode==='camera'&&window.KeyframeModes?.camera?.pointerUp){
  const handled=window.KeyframeModes.camera.pointerUp({camera:S.camera,get md(){return md},set md(v){md=v},ui},null);
  if(handled)return
