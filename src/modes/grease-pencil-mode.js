@@ -12,6 +12,7 @@ const state={
   focal:720,grid:80,drawPlane:'XY',
   pageVisible:true,pageWidth:960,pageHeight:540,pageDepth:0,
   cameraPath:[],cameraPathFrames:[],cameraPathEase:[],cameraPathSelected:-1,cameraPathDrawing:false,
+  frameStart:1,frameEnd:240,
   sceneCamera:{position:[0,0,720],target:[0,0,0],lens:50,show:true,view:false,selected:false},
   selected:null,selectedPoint:-1,edit:false,
   transform:null,drag:null,gizmoSize:70,snap:.5
@@ -23,9 +24,21 @@ function ensure(S){
   state.distance=S.gp3d.distance??state.distance;state.target=[...(S.gp3d.target||[0,0,0])];
   state.focal=S.gp3d.focal||720;state.grid=S.gp3d.grid||80;
   state.pageVisible=S.gp3d.pageVisible!==false;state.pageWidth=S.gp3d.pageWidth||960;state.pageHeight=S.gp3d.pageHeight||540;state.pageDepth=S.gp3d.pageDepth||0;
-  state.cameraPath=Array.isArray(S.gp3d.cameraPath)?S.gp3d.cameraPath.map(p=>[...p]):[];
-  state.cameraPathFrames=Array.isArray(S.gp3d.cameraPathFrames)&&S.gp3d.cameraPathFrames.length===state.cameraPath.length?S.gp3d.cameraPathFrames.map(v=>cl(Math.round(+v)||S.a,S.a,S.b)):state.cameraPath.map((_,i)=>Math.round(S.a+(S.b-S.a)*(i/Math.max(1,state.cameraPath.length-1))));
-  state.cameraPathEase=Array.isArray(S.gp3d.cameraPathEase)&&S.gp3d.cameraPathEase.length===state.cameraPath.length?S.gp3d.cameraPathEase.map(v=>['linear','ease','in','out','hold','bezier'].includes(v)?v:'ease'):state.cameraPath.map(()=> 'ease');
+  state.frameStart=Number.isFinite(+S.a)?+S.a:1;
+  state.frameEnd=Number.isFinite(+S.b)?+S.b:240;
+  const rawPath=Array.isArray(S.gp3d.cameraPath)?S.gp3d.cameraPath:[];
+  const rawFrames=Array.isArray(S.gp3d.cameraPathFrames)?S.gp3d.cameraPathFrames:[];
+  const rawEase=Array.isArray(S.gp3d.cameraPathEase)?S.gp3d.cameraPathEase:[];
+  const valid=[];
+  rawPath.forEach((p,i)=>{
+    if(!Array.isArray(p)||p.length<3)return;
+    const q=[Number(p[0]),Number(p[1]),Number(p[2])];
+    if(q.every(Number.isFinite))valid.push({p:q,f:cl(Math.round(Number(rawFrames[i])||state.frameStart),state.frameStart,state.frameEnd),e:['linear','ease','in','out','hold','bezier'].includes(rawEase[i])?rawEase[i]:'ease'});
+  });
+  valid.sort((a,b)=>a.f-b.f);
+  state.cameraPath=valid.map(x=>x.p);
+  state.cameraPathFrames=valid.map(x=>x.f);
+  state.cameraPathEase=valid.map(x=>x.e);
   state.sceneCamera={position:[...(S.gp3d.sceneCamera?.position||[0,0,720])],target:[...(S.gp3d.sceneCamera?.target||[0,0,0])],lens:S.gp3d.sceneCamera?.lens||50,show:S.gp3d.sceneCamera?.show!==false,view:!!S.gp3d.sceneCamera?.view,selected:!!S.gp3d.sceneCamera?.selected};
 }
 function persist(S){
@@ -175,8 +188,12 @@ function drawCameraPath(c){
   c.restore();
 }
 function sortCameraPath(){
-  const a=state.cameraPath.map((p,i)=>({p,f:state.cameraPathFrames[i]??state.a,e:state.cameraPathEase[i]||'ease'})).sort((x,y)=>x.f-y.f);
-  state.cameraPath=a.map(x=>x.p);state.cameraPathFrames=a.map(x=>cl(x.f,state.a,state.b));state.cameraPathEase=a.map(x=>x.e);
+  const a=state.cameraPath.map((p,i)=>({p,f:Number.isFinite(+state.cameraPathFrames[i])?+state.cameraPathFrames[i]:state.frameStart,e:state.cameraPathEase[i]||'ease'}))
+    .filter(x=>Array.isArray(x.p)&&x.p.length>=3&&x.p.slice(0,3).every(Number.isFinite))
+    .sort((x,y)=>x.f-y.f);
+  state.cameraPath=a.map(x=>[+x.p[0],+x.p[1],+x.p[2]]);
+  state.cameraPathFrames=a.map(x=>cl(Math.round(x.f),state.frameStart,state.frameEnd));
+  state.cameraPathEase=a.map(x=>['linear','ease','in','out','hold','bezier'].includes(x.e)?x.e:'ease');
 }
 function easeCamera(t,mode){
   if(mode==='linear')return t;
@@ -187,10 +204,14 @@ function easeCamera(t,mode){
   return t*t*(3-2*t);
 }
 function sampleCameraPath(frame){
-  if(state.cameraPath.length<1)return false;
   sortCameraPath();
-  if(state.cameraPath.length===1){state.sceneCamera.position=[...state.cameraPath[0]];return true}
+  if(state.cameraPath.length<1)return false;
+  if(state.cameraPath.length===1){
+    state.sceneCamera.position=[...state.cameraPath[0]];
+    return true;
+  }
   const fs=state.cameraPathFrames,pts=state.cameraPath;
+  if(fs.length<2||pts.length<2)return false;
   let aIndex=0,bIndex=1,t=0;
   if(frame<=fs[0]){bIndex=1;t=0}
   else if(frame>=fs[fs.length-1]){aIndex=fs.length-2;bIndex=fs.length-1;t=1}
