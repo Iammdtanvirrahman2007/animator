@@ -166,7 +166,7 @@ function keydown(ctx,e){
   const k=e.key.toLowerCase();
   if(k==='1'&&e.code==='Numpad1'){state.yaw=0;state.pitch=0;persist(ctx.S);ctx.render();return true}
   if(k==='3'&&e.code==='Numpad3'){state.yaw=Math.PI/2;state.pitch=0;persist(ctx.S);ctx.render();return true}
-  if(k==='7'&&e.code==='Numpad7'){state.yaw=0;state.pitch=-Math.PI/2+.001;persist(ctx.S);ctx.render();return true}
+  if(k==='7'&&e.code==='Numpad7'){state.yaw=0;state.pitch=Math.PI/2-.001;persist(ctx.S);ctx.render();return true}
   if(k==='0'&&e.code==='Numpad0'){state.yaw=.35;state.pitch=-.22;persist(ctx.S);ctx.render();return true}
   if(k==='['||k===']'){
     const L=ctx.S.l[ctx.S.i];if(!L)return true;
