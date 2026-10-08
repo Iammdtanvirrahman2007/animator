@@ -313,7 +313,7 @@ function drawOnion(c,S,f){
 }
 function draw(ctx,S,f,on){
   ensure(S);
-  if(state.cameraPath.length>0&&!state.sceneCamera.selected)sampleCameraPath(f);ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.fillStyle='#202124';ctx.fillRect(0,0,960,540);
+  if(state.cameraPath.length>0&&!state.sceneCamera.selected){sampleCameraPath(f);if(state.sceneCamera.view)applyCameraView();}ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.fillStyle='#202124';ctx.fillRect(0,0,960,540);
   drawPage(ctx);drawGrid(ctx);drawSceneCamera(ctx);drawCameraPath(ctx);drawOnion(ctx,S,f);
   const ordered=[];S.l.forEach((L,i)=>{if(!L.v)return;for(const s of L.d?.[f]||[])ordered.push({s,i,z:Number.isFinite(+s.z)?+s.z:(Number.isFinite(+L.gpZ)?+L.gpZ:i*45)})});
   ordered.sort((a,b)=>b.z-a.z);for(const q of ordered)drawStroke(ctx,q.s);
@@ -391,6 +391,8 @@ function pointerDown(ctx,e){
     }
   }
   if(ctx.tool==='cameraPath'){
+    const existing=state.cameraPath.map(project).map((p,i)=>p?{i,d:Math.hypot(p[0]-sx,p[1]-sy)}:null).filter(Boolean).sort((a,b)=>a.d-b.d)[0];
+    if(existing&&existing.d<14&&!e.shiftKey){state.cameraPathSelected=existing.i;ctx.ui?.();ctx.render();return true}
     const w=planePoint(sx,sy,'XY',0);
     if(e.shiftKey){state.cameraPath=[];state.cameraPathFrames=[]}
     state.cameraPath.push(w);
