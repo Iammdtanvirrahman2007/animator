@@ -12,7 +12,7 @@ const state={
   focal:720,grid:80,drawPlane:'XY',
   pageVisible:true,pageWidth:960,pageHeight:540,pageDepth:0,
   cameraPath:[],cameraPathSelected:-1,cameraPathDrawing:false,
-  sceneCamera:{position:[0,0,720],target:[0,0,0],lens:50,show:true},
+  sceneCamera:{position:[0,0,720],target:[0,0,0],lens:50,show:true,view:false,selected:false},
   selected:null,selectedPoint:-1,edit:false,
   transform:null,drag:null,gizmoSize:70,snap:.5
 };
@@ -24,11 +24,11 @@ function ensure(S){
   state.focal=S.gp3d.focal||720;state.grid=S.gp3d.grid||80;
   state.pageVisible=S.gp3d.pageVisible!==false;state.pageWidth=S.gp3d.pageWidth||960;state.pageHeight=S.gp3d.pageHeight||540;state.pageDepth=S.gp3d.pageDepth||0;
   state.cameraPath=Array.isArray(S.gp3d.cameraPath)?S.gp3d.cameraPath.map(p=>[...p]):[];
-  state.sceneCamera={position:[...(S.gp3d.sceneCamera?.position||[0,0,720])],target:[...(S.gp3d.sceneCamera?.target||[0,0,0])],lens:S.gp3d.sceneCamera?.lens||50,show:S.gp3d.sceneCamera?.show!==false};
+  state.sceneCamera={position:[...(S.gp3d.sceneCamera?.position||[0,0,720])],target:[...(S.gp3d.sceneCamera?.target||[0,0,0])],lens:S.gp3d.sceneCamera?.lens||50,show:S.gp3d.sceneCamera?.show!==false,view:!!S.gp3d.sceneCamera?.view,selected:!!S.gp3d.sceneCamera?.selected};
 }
 function persist(S){
   if(!S.gp3d)S.gp3d={};
-  Object.assign(S.gp3d,{yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[...state.target],focal:state.focal,grid:state.grid,pageVisible:state.pageVisible,pageWidth:state.pageWidth,pageHeight:state.pageHeight,pageDepth:state.pageDepth,cameraPath:state.cameraPath.map(p=>[...p]),sceneCamera:{position:[...state.sceneCamera.position],target:[...state.sceneCamera.target],lens:state.sceneCamera.lens,show:state.sceneCamera.show},active:true});
+  Object.assign(S.gp3d,{yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[...state.target],focal:state.focal,grid:state.grid,pageVisible:state.pageVisible,pageWidth:state.pageWidth,pageHeight:state.pageHeight,pageDepth:state.pageDepth,cameraPath:state.cameraPath.map(p=>[...p]),sceneCamera:{position:[...state.sceneCamera.position],target:[...state.sceneCamera.target],lens:state.sceneCamera.lens,show:state.sceneCamera.show,view:state.sceneCamera.view,selected:state.sceneCamera.selected},active:true});
 }
 function camera(){
   const cp=Math.cos(state.pitch),sp=Math.sin(state.pitch),cy=Math.cos(state.yaw),sy=Math.sin(state.yaw);
@@ -93,6 +93,19 @@ function drawPage(c){
   if(label)c.fillText('2D ANIMATION PAGE',label[0]-58,label[1]);
   c.restore();
 }
+function cameraViewTransform(){
+  const cam=state.sceneCamera,pos=cam.position,target=cam.target;
+  const f=norm(vsub(target,pos)), yaw=Math.atan2(f[0],f[2]), pitch=Math.asin(f[1]);
+  return{yaw,pitch,distance:Math.max(100,length3(vsub(target,pos))),target:[...target]};
+}
+function applyCameraView(){
+  const t=cameraViewTransform();
+  state.yaw=t.yaw;state.pitch=t.pitch;state.distance=t.distance;state.target=[...t.target];
+}
+function selectSceneCamera(x,y){
+  const p=project(state.sceneCamera.position);
+  return !!p&&Math.hypot(p[0]-x,p[1]-y)<24;
+}
 function drawSceneCamera(c){
   if(!state.sceneCamera.show)return;
   const cam=state.sceneCamera, pos=cam.position, target=cam.target;
@@ -116,7 +129,7 @@ function drawSceneCamera(c){
   const pp=p=>project(p);
   const P=nc.map(pp),Q=fc.map(pp),O=pp(pos);
   if(!O||P.some(x=>!x)||Q.some(x=>!x))return;
-  c.save();c.strokeStyle='#ff9f32';c.fillStyle='#ff9f32';c.lineWidth=2;
+  c.save();c.strokeStyle=cam.selected?'#ffffff':'#ff9f32';c.fillStyle='#ff9f32';c.lineWidth=2;
   c.beginPath();c.moveTo(P[0][0],P[0][1]);for(let i=1;i<4;i++)c.lineTo(P[i][0],P[i][1]);c.closePath();c.stroke();
   c.beginPath();c.moveTo(Q[0][0],Q[0][1]);for(let i=1;i<4;i++)c.lineTo(Q[i][0],Q[i][1]);c.closePath();c.stroke();
   for(let i=0;i<4;i++){c.beginPath();c.moveTo(P[i][0],P[i][1]);c.lineTo(Q[i][0],Q[i][1]);c.stroke()}
@@ -317,6 +330,13 @@ function pointerDown(ctx,e){
   }
   if(e.button!==0)return false;
   const S=ctx.S,[sx,sy]=screen(e);
+  if(state.sceneCamera.view){
+    if(e.button===0)return true;
+  }
+  if((ctx.tool==='select'||ctx.tool==='edit')&&!state.edit&&selectSceneCamera(sx,sy)){
+    state.sceneCamera.selected=true;
+    ctx.ui?.();ctx.render();return true;
+  }
   if((ctx.tool==='select'||ctx.tool==='edit')&&state.edit){
     const gh=gizmoHit(sx,sy);
     if(gh&&state.selected?.s){
@@ -359,6 +379,20 @@ function pointerDown(ctx,e){
   ctx.md={t:'gpDraw',L,s};ctx.render();return true;
 }
 function pointerMove(ctx,e){
+  if(state.sceneCamera.selected&&ctx.md?.t==='cameraTransform'){
+    const cam=state.sceneCamera,dx=e.clientX-ctx.md.x,dy=e.clientY-ctx.md.y;
+    if(ctx.md.type==='g'){
+      const v=camera();const delta=vadd(vmul(v.right,dx*.8),vmul(v.up,-dy*.8));
+      cam.position=vadd(ctx.md.position,delta);cam.target=vadd(ctx.md.target,delta);
+    }else if(ctx.md.type==='r'){
+      const yaw=ctx.md.yaw-dx*.008,pitch=clamp(ctx.md.pitch+dy*.006,-1.45,1.45);
+      const f=[Math.cos(pitch)*Math.sin(yaw),Math.sin(pitch),Math.cos(pitch)*Math.cos(yaw)];
+      cam.target=vadd(cam.position,vmul(f,Math.max(100,ctx.md.distance)));
+    }else if(ctx.md.type==='s'){
+      cam.lens=clamp(ctx.md.lens*Math.exp(-dy*.008),12,200);
+    }
+    persist(ctx.S);ctx.render();return true;
+  }
   if(state.transform){
     const t=state.transform,dx=e.clientX-t.x,dy=e.clientY-t.y,s=selectedStroke();
     if(s){transformStroke(s,t.type,dx,dy,t.axis);persist(ctx.S);ctx.render();return true}
@@ -416,13 +450,24 @@ function keydown(ctx,e){
   if(k==='1'&&e.code==='Numpad1'){state.yaw=0;state.pitch=0;persist(ctx.S);ctx.render();return true}
   if(k==='3'&&e.code==='Numpad3'){state.yaw=Math.PI/2;state.pitch=0;persist(ctx.S);ctx.render();return true}
   if(k==='7'&&e.code==='Numpad7'){state.yaw=0;state.pitch=Math.PI/2-.001;persist(ctx.S);ctx.render();return true}
-  if(k==='0'&&e.code==='Numpad0'){state.yaw=.35;state.pitch=-.22;persist(ctx.S);ctx.render();return true}
+  if(k==='0'&&e.code==='Numpad0'){
+    state.sceneCamera.view=!state.sceneCamera.view;
+    if(state.sceneCamera.view){applyCameraView()}else{state.yaw=.35;state.pitch=-.22}
+    persist(ctx.S);ctx.render();return true
+  }
   if(k==='x'||k==='y'||k==='z'){state.drawPlane=k==='x'?'YZ':k==='y'?'XZ':'XY';ctx.ui?.();ctx.render();return true}
   if(k==='tab'){state.edit=!state.edit;ctx.ui?.();ctx.render();return true}
   if(k==='f'){ctx.tool='fill';ctx.ui?.();ctx.render();return true}
   if(k==='c'&&!e.ctrlKey&&!e.metaKey){ctx.tool='cameraPath';ctx.ui?.();ctx.render();return true}
   if(k==='p'&&!e.ctrlKey&&!e.metaKey){state.pageVisible=!state.pageVisible;ctx.ui?.();ctx.render();return true}
-  if(k==='g'||k==='r'||k==='s')return beginTransform(ctx,k,null,e);
+  if(k==='g'||k==='r'||k==='s'){
+    if(state.sceneCamera.selected){
+      const cam=state.sceneCamera;
+      ctx.md={t:'cameraTransform',type:k,x:e.clientX,y:e.clientY,position:[...cam.position],target:[...cam.target],lens:cam.lens,yaw:cameraViewTransform().yaw,pitch:cameraViewTransform().pitch,distance:cameraViewTransform().distance};
+      return true;
+    }
+    return beginTransform(ctx,k,null,e)
+  };
   if(k==='delete'||k==='backspace'){
     if(state.edit&&state.selected?.s&&state.selectedPoint>=0){
       const s=state.selected.s;if(s.gp3?.length>2){ctx.snap?.();s.gp3.splice(state.selectedPoint,1);s.p.splice(state.selectedPoint,1);state.selectedPoint=cl(state.selectedPoint-1,0,s.gp3.length-1);ctx.render()}else deleteSelected(ctx);
@@ -430,7 +475,7 @@ function keydown(ctx,e){
     return true;
   }
   if(e.shiftKey&&k==='d'){duplicateSelected(ctx);return true}
-  if(k==='escape'){state.transform=null;state.selected=null;state.selectedPoint=-1;ctx.ui?.();ctx.render();return true}
+  if(k==='escape'){state.transform=null;state.sceneCamera.selected=false;state.selected=null;state.selectedPoint=-1;ctx.ui?.();ctx.render();return true}
   return false;
 }
 export const greasePencilMode={
