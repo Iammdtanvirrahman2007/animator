@@ -129,7 +129,7 @@ body{font-size:12px;letter-spacing:.05px}
 #hd button{min-height:24px;padding:3px 9px;font-size:11px}
 #hd .mode-btn{min-width:48px}#hd .mode-btn.on{background:#f08018;border-color:#ff9c3a;color:#1e1f22}
 
-#sx{font-size:11px;color:#c3c5ca}
+#sx{font-size:11px;color:#c3c5ca}#ver{font-size:9px;color:#8f939a;background:#242529;border:1px solid #44454a;border-radius:3px;padding:2px 5px;margin-right:2px}
 #mid{grid-template-columns:46px minmax(0,1fr) 248px}
 #tb{gap:5px;padding:7px 5px}
 #tb button{height:34px;font-size:16px}
@@ -160,7 +160,7 @@ input[type=color]{border-color:#505157!important}
 @media(max-width:760px){#mid{grid-template-columns:40px minmax(0,1fr) 176px}#sd{padding-left:8px;padding-right:8px}}
 @media(max-width:480px){#mid{grid-template-columns:34px minmax(0,1fr) 148px}#sd{padding-left:6px;padding-right:6px}#th{gap:4px}}
 </style></head><body><div id="app">
-<header id="hd"><b class="lg">Keyframe</b><button id="modeObject" class="mode-btn on" title="Select and move strokes (Tab: switch mode)">Object</button><button id="modeEdit" class="mode-btn" title="Edit stroke control points (Tab: switch mode)">Edit</button><i></i><button id="bn">New</button><button id="bs">Save</button><button id="bo">Open</button><input id="ld" type="file" accept=".json" hidden><i></i><button id="bu">Undo</button><button id="br">Redo</button><i></i><button id="bp">PNG</button><button id="bw">WebM</button><i></i><button id="bh">Keys ?</button><span id="sx"></span></header>
+<header id="hd"><b class="lg">Keyframe</b><span id="ver">0.3</span><button id="modeObject" class="mode-btn on" title="Select and move strokes (Tab: switch mode)">Object</button><button id="modeEdit" class="mode-btn" title="Edit stroke control points (Tab: switch mode)">Edit</button><i></i><button id="bn">New</button><button id="bs">Save</button><button id="bo">Open</button><input id="ld" type="file" accept=".json" hidden><i></i><button id="bu">Undo</button><button id="br">Redo</button><i></i><button id="bp">PNG</button><button id="bw">WebM</button><i></i><button id="bh">Keys ?</button><span id="sx"></span></header>
 <div id="mid"><nav id="tb"></nav>
 <div id="vp"><canvas id="cv" width="960" height="540"></canvas><pre id="hp" hidden>Space play   ←/→ frame   ↑/↓ prev/next key   Shift+←/→ start/end
 Object: V select/move stroke · Edit: drag control points · Tab switch mode · Delete selected stroke
@@ -191,7 +191,7 @@ Wheel zoom   Alt/Middle-drag pan   Home reset view</pre></div>
 <canvas id="ds"></canvas></section></div>
 <script>
 const cx=cv.getContext('2d'),W=960,H=540,ks=o=>Object.keys(o).map(Number).sort((a,b)=>a-b),cl=(v,a,b)=>Math.max(a,Math.min(b,v)),clone=o=>JSON.parse(JSON.stringify(o)),esc=s=>s.replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';');
-let S,hist=[],fut=[],tool='draw',mode='object',selectedObject=null,playing=false,rc=0,view={x:0,y:0,z:1},md=null,mo=null,ms=[W/2,H/2],last=0,saveT,mt;
+let S,hist=[],fut=[],tool='draw',mode='object',selectedObject=null,playing=false,rc=0,view={x:0,y:0,z:1},md=null,mo=null,ms=[W/2,H/2],last=0,saveT,mt,dirty=false;
 let frameSel=new Set(),frameAnchor=null,frameClip=[],timelineDrag=null,pendingShape=null;
 const mk=n=>({n,v:1,bm:'source-over',e:'ease',px:W/2,py:H/2,d:{},k:{}}),fresh=()=>({fps:24,a:1,b:48,f:1,i:0,on:1,bg:'#fbfaf7',l:[mk('Layer 1')]});
 const ez={linear:t=>t,ease:t=>t*t*(3-2*t),in:t=>t*t,out:t=>1-(1-t)*(1-t),hold:()=>0,bounce:t=>{const n=7.5625,d=2.75;if(t<1/d)return n*t*t;if(t<2/d)return n*(t-=1.5/d)*t+.75;if(t<2.5/d)return n*(t-=2.25/d)*t+.9375;return n*(t-=2.625/d)*t+.984375}};
@@ -226,7 +226,7 @@ function hitStroke(A,x,y){for(let i=A.length-1;i>=0;i--){const p=A[i].p;for(let 
 function nearestPoint(s,x,y){let best=-1,dist=15;for(let i=0;i<s.p.length;i++){const d=Math.hypot(x-s.p[i][0],y-s.p[i][1]);if(d<dist){dist=d;best=i}}return best}
 function setMode(m){mode=m;tool='select';vp.classList.remove('cursor-object','cursor-point');ui();msg(m==='object'?'Object Mode — select and move strokes':'Edit Mode — drag control points')}
 function deleteSelected(){const q=selectedObject;if(!q||q.L!==S.l[S.i]||q.f!==S.f)return;const a=dr(q.L,q.f),i=a.indexOf(q.s);if(i<0)return;snap();a.splice(i,1);selectedObject=null;ui()}
-function snap(){hist.push(JSON.stringify(S));if(hist.length>80)hist.shift();fut=[]}
+function snap(){hist.push(JSON.stringify(S));if(hist.length>80)hist.shift();fut=[];dirty=true}
 function undo(){if(!hist.length)return;fut.push(JSON.stringify(S));const f=S.f;S=JSON.parse(hist.pop());S.f=cl(f,S.a,S.b);ui(1)}
 function redo(){if(!fut.length)return;hist.push(JSON.stringify(S));const f=S.f;S=JSON.parse(fut.pop());S.f=cl(f,S.a,S.b);ui(1)}
 vp.onpointerdown=e=>{vp.setPointerCapture(e.pointerId);
@@ -309,8 +309,8 @@ function tick(t){if(!playing)return;if(t-last>=1000/S.fps){last=t;if(S.f>=S.b){i
 function addL(){snap();S.l.splice(S.i+1,0,mk('Layer '+(S.l.length+1)));S.i++;ui(1)}
 function delL(){if(S.l.length<2)return msg('Keep at least one layer');snap();S.l.splice(S.i,1);S.i=Math.max(0,S.i-1);ui(1)}
 function mvL(d){const j=S.i+d;if(j<0||j>=S.l.length)return;snap();[S.l[S.i],S.l[j]]=[S.l[j],S.l[S.i]];S.i=j;ui(1)}
-const dl=(n,b)=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click()};
-async function save(n,b){try{const d=window.claude&&await claude.use('downloads');if(d){await d.save({filename:n,data:b});msg('Saved '+n)}else dl(n,b)}catch(e){if(!e||e.code!='declined')msg('Save failed: '+((e&&e.message)||e))}}
+const dl=(n,b)=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+async function save(n,b){try{const d=window.claude&&await claude.use('downloads');if(d){await d.save({filename:n,data:b});msg('Saved '+n)}else dl(n,b);dirty=false;ui()}catch(e){if(!e||e.code!='declined')msg('Save failed: '+((e&&e.message)||e))}}
 function png(){const c=document.createElement('canvas');c.width=W;c.height=H;draw(c.getContext('2d'),S.f,0);c.toBlob(b=>save('frame-'+S.f+'.png',b))}
 function rec(){if(rc)return;let m;try{m=new MediaRecorder(cv.captureStream(S.fps),{mimeType:'video/webm'})}catch(e){return msg('WebM export is not supported in this browser')}
  const ch=[];m.ondataavailable=e=>ch.push(e.data);m.onstop=()=>{rc=0;ui();save('animation.webm',new Blob(ch,{type:'video/webm'}))};rc=m;go(S.a);m.start();play(true);msg('Recording one pass…')}
@@ -342,9 +342,9 @@ bm.onchange=e=>{snap();S.l[S.i].bm=e.target.value;ui()};ie.onchange=e=>{snap();S
 oi.oninput=e=>{S.on=+e.target.value;ui()};bgc.oninput=e=>{S.bg=e.target.value;ui()};
 fi.onchange=e=>go(+e.target.value);fps.onchange=e=>{S.fps=cl(+e.target.value||24,1,120);ui()};
 fa.onchange=e=>{S.a=cl(Math.round(+e.target.value)||1,1,S.b);S.f=cl(S.f,S.a,S.b);ui()};fb.onchange=e=>{S.b=cl(Math.round(+e.target.value)||48,S.a,999);S.f=cl(S.f,S.a,S.b);ui()};
-bn.onclick=()=>{snap();S=fresh();fit();ui(1);msg('New project — Undo brings the old one back')};
+bn.onclick=()=>{snap();S=fresh();fit();dirty=true;ui(1);msg('New project — Undo brings the old one back')};
 bs.onclick=()=>save('animation.json',new Blob([JSON.stringify(S)],{type:'application/json'}));bo.onclick=()=>ld.click();bu.onclick=undo;br.onclick=redo;bp.onclick=png;bw.onclick=rec;bh.onclick=()=>hp.hidden=!hp.hidden;
-ld.onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());if(!j.l||!j.l.length)throw 0;snap();S=j;S.i=cl(S.i|0,0,S.l.length-1);S.f=cl(S.f||1,S.a,S.b);ui(1)}catch(x){msg('That is not a Keyframe project file')}e.target.value=''};
+ld.onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());if(!j.l||!j.l.length)throw 0;snap();S=j;S.i=cl(S.i|0,0,S.l.length-1);S.f=cl(S.f||1,S.a,S.b);dirty=false;ui(1)}catch(x){msg('That is not a Keyframe project file')}e.target.value=''};
 addEventListener('change',e=>e.target.blur());addEventListener('click',e=>{if(e.target.tagName=='BUTTON')e.target.blur()});
 addEventListener('resize',()=>{fit();DS()});
 addEventListener('keydown',e=>{const T=e.target;if(/^(SELECT|TEXTAREA)$/.test(T.tagName)||T.type=='number'||T.type=='text')return;
@@ -365,7 +365,7 @@ function ui(full){if(full)LL();R();DS();const L=S.l[S.i],A=document.activeElemen
  if(L){const t=ev(L,S.f);tf.querySelectorAll('input').forEach(i=>{if(A!=i)i.value=+(+t[i.dataset.p]).toFixed(2)});if(A!=ln)ln.value=L.n;bm.value=L.bm;ie.value=L.e}
  [[fi,S.f],[fps,S.fps],[fa,S.a],[fb,S.b]].forEach(([i,v])=>{if(A!=i)i.value=v});oi.value=S.on;bgc.value=S.bg;
  tb.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t==tool));modeObject.classList.toggle('on',mode==='object');modeEdit.classList.toggle('on',mode==='edit');
- clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.kf=JSON.stringify(S)}catch(e){}},600)}
-try{S=JSON.parse(localStorage.kf);if(!S.l.length)throw 0}catch(e){S=fresh()}
+ clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('keyframe.project.v3',JSON.stringify(S))}catch(e){}},600);sx.textContent=(dirty?'● Unsaved changes':'✓ Saved locally')}
+try{S=JSON.parse(localStorage.getItem('keyframe.project.v3')||localStorage.kf);if(!S.l.length)throw 0}catch(e){S=fresh()}
 S.i=cl(S.i|0,0,S.l.length-1);fit();ui(1);
 </script></body></html>
