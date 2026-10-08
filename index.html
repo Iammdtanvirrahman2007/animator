@@ -251,6 +251,14 @@ vp.onpointerdown=e=>{vp.setPointerCapture(e.pointerId);
  if(mo){endMo();return}
  const L=S.l[S.i];if(!L||e.button||!L.v)return;const p=pt(e),f=S.f;
  if(mode==='object'&&window.KeyframeModes?.object?.pointerDown){window.KeyframeModes.object.pointerDown({S,pt,loc,dr,hitStroke,R,get selectedObject(){return selectedObject},set selectedObject(v){selectedObject=v},get md(){return md},set md(v){md=v},snap,ui},e);return}
+ if(mode==='edit'&&window.KeyframeModes?.edit?.pointerDown){
+ const handled=window.KeyframeModes.edit.pointerDown({
+  S,pt,loc,dr,hitStroke,nearestPoint,R,snap,ui,
+  get selectedObject(){return selectedObject},set selectedObject(v){selectedObject=v},
+  get md(){return md},set md(v){md=v}
+ },e);
+ if(handled)return
+}
  if(mode==='draw'&&window.KeyframeModes?.draw?.pointerDown){
  window.KeyframeModes.draw.pointerDown({
   S,pt,loc,dr,shape,clone,R,snap,ad,col,sz,fl,ev,er,tool,
@@ -277,6 +285,12 @@ vp.onpointermove=e=>{const p=pt(e);ms=p;if(mo){mv(p);return}if(!md&&(mode==='edi
  },e);
  if(handled)return
 }
+ if(mode==='edit'&&window.KeyframeModes?.edit?.pointerMove){
+ const handled=window.KeyframeModes.edit.pointerMove({
+  pt,loc,R,snap,get md(){return md},set md(v){md=v}
+ },e);
+ if(handled)return
+}
  if(md.t=='objectMove'&&mode==='object'&&window.KeyframeModes?.object?.pointerMove){window.KeyframeModes.object.pointerMove({S,pt,loc,R,get md(){return md},set md(v){md=v},snap,ui},e);return}
  if(md.t=='objectMove'||md.t=='editPoint'){const q=loc(md.L,md.f,p[0],p[1]),dx=q[0]-md.last[0],dy=q[1]-md.last[1];if((dx||dy)&&!md.changed){snap();md.changed=true}if(md.t==='objectMove'){for(const v of md.s.p){v[0]+=dx;v[1]+=dy}}else{md.s.p[md.index][0]+=dx;md.s.p[md.index][1]+=dy}md.last=q;R();return}
  if(md.t=='pendingMove'){const q=loc(md.L,pendingShape.f,p[0],p[1]),dx=q[0]-md.last[0],dy=q[1]-md.last[1];for(const v of md.s.p){v[0]+=dx;v[1]+=dy}md.last=q;R();return}
@@ -292,6 +306,10 @@ vp.onpointerup=()=>{if(md&&md.t=='draw'){const p=md.s.p;for(let k=0;k<+sm.value;
   get pendingShape(){return pendingShape},set pendingShape(v){pendingShape=v},
   ui,sm,vp,R,msg
  });
+ if(handled)return
+}
+ if(mode==='edit'&&window.KeyframeModes?.edit?.pointerUp){
+ const handled=window.KeyframeModes.edit.pointerUp({get md(){return md},set md(v){md=v},ui});
  if(handled)return
 }
  if(md?.t==='objectMove'&&mode==='object'&&window.KeyframeModes?.object?.pointerUp){window.KeyframeModes.object.pointerUp({ui,get md(){return md},set md(v){md=v}});return}
