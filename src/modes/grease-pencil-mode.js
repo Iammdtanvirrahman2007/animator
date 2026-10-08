@@ -11,7 +11,7 @@ const state={
   yaw:.35,pitch:-.22,distance:900,target:[0,0,0],
   focal:720,grid:80,drawPlane:'XY',
   pageVisible:true,pageWidth:960,pageHeight:540,pageDepth:0,
-  cameraPath:[],cameraPathSelected:-1,cameraPathDrawing:false,
+  cameraPath:[],cameraPathFrames:[],cameraPathEase:[],cameraPathSelected:-1,cameraPathDrawing:false,
   sceneCamera:{position:[0,0,720],target:[0,0,0],lens:50,show:true,view:false,selected:false},
   selected:null,selectedPoint:-1,edit:false,
   transform:null,drag:null,gizmoSize:70,snap:.5
@@ -25,12 +25,13 @@ function ensure(S){
   state.pageVisible=S.gp3d.pageVisible!==false;state.pageWidth=S.gp3d.pageWidth||960;state.pageHeight=S.gp3d.pageHeight||540;state.pageDepth=S.gp3d.pageDepth||0;
   state.cameraPath=Array.isArray(S.gp3d.cameraPath)?S.gp3d.cameraPath.map(p=>[...p]):[];
   state.cameraPathFrames=Array.isArray(S.gp3d.cameraPathFrames)&&S.gp3d.cameraPathFrames.length===state.cameraPath.length?S.gp3d.cameraPathFrames.map(v=>cl(Math.round(+v)||S.a,S.a,S.b)):state.cameraPath.map((_,i)=>Math.round(S.a+(S.b-S.a)*(i/Math.max(1,state.cameraPath.length-1))));
+  state.cameraPathEase=Array.isArray(S.gp3d.cameraPathEase)&&S.gp3d.cameraPathEase.length===state.cameraPath.length?S.gp3d.cameraPathEase.map(v=>['linear','ease','in','out','hold','bezier'].includes(v)?v:'ease'):state.cameraPath.map(()=> 'ease');
   state.sceneCamera={position:[...(S.gp3d.sceneCamera?.position||[0,0,720])],target:[...(S.gp3d.sceneCamera?.target||[0,0,0])],lens:S.gp3d.sceneCamera?.lens||50,show:S.gp3d.sceneCamera?.show!==false,view:!!S.gp3d.sceneCamera?.view,selected:!!S.gp3d.sceneCamera?.selected};
 }
 function persist(S){
   if(!S.gp3d)S.gp3d={};
   S.l?.forEach((L,i)=>{if(!Number.isFinite(+L.gpZ))L.gpZ=i*45});
-  Object.assign(S.gp3d,{yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[...state.target],focal:state.focal,grid:state.grid,pageVisible:state.pageVisible,pageWidth:state.pageWidth,pageHeight:state.pageHeight,pageDepth:state.pageDepth,cameraPath:state.cameraPath.map(p=>[...p]),cameraPathFrames:[...state.cameraPathFrames],sceneCamera:{position:[...state.sceneCamera.position],target:[...state.sceneCamera.target],lens:state.sceneCamera.lens,show:state.sceneCamera.show,view:state.sceneCamera.view,selected:state.sceneCamera.selected},active:true});
+  Object.assign(S.gp3d,{yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[...state.target],focal:state.focal,grid:state.grid,pageVisible:state.pageVisible,pageWidth:state.pageWidth,pageHeight:state.pageHeight,pageDepth:state.pageDepth,cameraPath:state.cameraPath.map(p=>[...p]),cameraPathFrames:[...state.cameraPathFrames],cameraPathEase:[...state.cameraPathEase],sceneCamera:{position:[...state.sceneCamera.position],target:[...state.sceneCamera.target],lens:state.sceneCamera.lens,show:state.sceneCamera.show,view:state.sceneCamera.view,selected:state.sceneCamera.selected},active:true});
 }
 function camera(){
   const cp=Math.cos(state.pitch),sp=Math.sin(state.pitch),cy=Math.cos(state.yaw),sy=Math.sin(state.yaw);
@@ -177,25 +178,28 @@ function sortCameraPath(){
   const a=state.cameraPath.map((p,i)=>({p,f:state.cameraPathFrames[i]??state.a,i})).sort((x,y)=>x.f-y.f);
   state.cameraPath=a.map(x=>x.p);state.cameraPathFrames=a.map(x=>cl(x.f,state.a,state.b));
 }
+function easeCamera(t,mode){
+  if(mode==='linear')return t;
+  if(mode==='hold')return t<1?0:1;
+  if(mode==='in')return t*t;
+  if(mode==='out')return 1-(1-t)*(1-t);
+  if(mode==='bezier')return t*t*(3-2*t);
+  return t*t*(3-2*t);
+}
 function sampleCameraPath(frame){
   if(state.cameraPath.length<1)return false;
   sortCameraPath();
-  if(state.cameraPath.length===1){
-    state.sceneCamera.position=[...state.cameraPath[0]];
-    return true;
-  }
-  const fs=state.cameraPathFrames, pts=state.cameraPath;
-  if(frame<=fs[0]){state.sceneCamera.position=[...pts[0]]}
-  else if(frame>=fs[fs.length-1]){state.sceneCamera.position=[...pts.at(-1)]}
-  else{
-    let j=1;while(j<fs.length&&frame>fs[j])j++;
-    const a=fs[j-1],b=fs[j],t=(frame-a)/Math.max(1,b-a);
-    const p=pts[j-1].map((v,k)=>v+(pts[j][k]-v)*t);
-    state.sceneCamera.position=p;
-  }
-  const idx=state.cameraPathFrames.findIndex(v=>v>=frame);
-  const j=cl(idx<0?fs.length-1:idx,1,pts.length-1);
-  const look=norm(vsub(pts[j],pts[j-1]));
+  if(state.cameraPath.length===1){state.sceneCamera.position=[...state.cameraPath[0]];return true}
+  const fs=state.cameraPathFrames,pts=state.cameraPath;
+  let aIndex=0,bIndex=1,t=0;
+  if(frame<=fs[0]){bIndex=1;t=0}
+  else if(frame>=fs[fs.length-1]){aIndex=fs.length-2;bIndex=fs.length-1;t=1}
+  else{bIndex=fs.findIndex(v=>v>=frame);aIndex=Math.max(0,bIndex-1);t=(frame-fs[aIndex])/Math.max(1,fs[bIndex]-fs[aIndex])}
+  t=easeCamera(t,state.cameraPathEase[aIndex]||'ease');
+  const p=pts[aIndex].map((v,k)=>v+(pts[bIndex][k]-v)*t);
+  state.sceneCamera.position=p;
+  const a=pts[Math.max(0,aIndex-1)],b=pts[Math.min(pts.length-1,bIndex+1)];
+  const look=norm(vsub(b,a));
   const distance=Math.max(120,length3(vsub(state.sceneCamera.target,state.sceneCamera.position)));
   state.sceneCamera.target=vadd(state.sceneCamera.position,vmul(look,distance));
   return true;
@@ -394,10 +398,10 @@ function pointerDown(ctx,e){
     const existing=state.cameraPath.map(project).map((p,i)=>p?{i,d:Math.hypot(p[0]-sx,p[1]-sy)}:null).filter(Boolean).sort((a,b)=>a.d-b.d)[0];
     if(existing&&existing.d<14&&!e.shiftKey){state.cameraPathSelected=existing.i;ctx.ui?.();ctx.render();return true}
     const w=planePoint(sx,sy,'XY',0);
-    if(e.shiftKey){state.cameraPath=[];state.cameraPathFrames=[]}
+    if(e.shiftKey){state.cameraPath=[];state.cameraPathFrames=[];state.cameraPathEase=[]}
     state.cameraPath.push(w);
     const n=state.cameraPath.length-1;
-    state.cameraPathFrames.push(n===0?S.a:cl(Math.max(S.a,(state.cameraPathFrames[n-1]??S.a)+1),S.a,S.b));
+    state.cameraPathFrames.push(n===0?S.a:cl(Math.max(S.a,(state.cameraPathFrames[n-1]??S.a)+1),S.a,S.b));state.cameraPathEase.push('ease');
     state.cameraPathSelected=n;
     persist(ctx.S);ctx.ui?.();ctx.render();return true;
   }
