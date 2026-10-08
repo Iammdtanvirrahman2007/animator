@@ -174,7 +174,7 @@ input[type=color]{border-color:#505157!important}
 <div id="vp"><canvas id="cv" width="960" height="540"></canvas><pre id="hp" hidden>Space play   ←/→ frame   ↑/↓ prev/next key   Shift+←/→ start/end\nExport: PNG · WebM · MP4
 Object: V select/move stroke · Edit: drag control points · Tab switch mode · Delete selected stroke
 D draw  E erase  L line  B box  O ellipse  P pivot
-Drag preview to move · edge/corner handles resize freely · drag top handle to rotate · wheel / [ ] scale
+3D: Select · Camera · Camera Path · Frame · Orbit · Pan · G/R/S transforms
 Arrows move   Shift+arrows: bigger nudge   Enter confirm   Esc cancel
 G move  R rotate  S scale   (X / Y axis, click or Enter ok, Esc cancel)
 I insert key   Alt+I delete key   X delete drawing
@@ -241,14 +241,14 @@ function setMode(m){
  if(prev==='camera'&&window.KeyframeModes?.camera?.exit)window.KeyframeModes.camera.exit({S,camera:S.camera});
  if(prev==='grease'&&window.KeyframeModes?.grease?.exit)window.KeyframeModes.grease.exit({S,render:R,ui});
  mode=m;
- const defaults={object:'select',draw:'draw',edit:'select',animate:'select',camera:'select',mask:'select',grease:'draw'};
+ const defaults={object:'select',draw:'draw',edit:'select',animate:'select',camera:'select',mask:'select',grease:'select'};
  tool=defaults[m]||'select';
  vp.classList.remove('cursor-object','cursor-point','camera-view','grease-pencil-view');
  if(m==='camera'){if(!S.camera)S.camera={x:W/2,y:H/2,zoom:1,r:0,w:W,h:H,view:true};S.camera.view=true;vp.classList.add('camera-view')}
  if(m==='grease'){if(!S.gp3d)S.gp3d={yaw:.35,pitch:-.22,distance:900,target:[0,0,0],focal:720,grid:80,active:true};S.gp3d.active=true;vp.classList.add('grease-pencil-view')}
  if(window.KeyframeModes?.[m]?.enter)window.KeyframeModes[m].enter({S,camera:S.camera,render:R,ui});
  ui();
- const names={object:'Object Mode — select, move, rotate and scale',draw:'Draw Mode — brush and shape tools',edit:'Edit Mode — edit stroke control points',animate:'Animate Mode — keyframes and timing',camera:'Camera Mode — Blender camera view · drag to pan · wheel to zoom',mask:'Mask Mode — mask and isolate drawing areas',grease:'Grease Pencil 3D — draw 2D strokes inside a 3D scene · MMB orbit · wheel dolly'};
+ const names={object:'Object Mode — select, move, rotate and scale',draw:'Draw Mode — brush and shape tools',edit:'Edit Mode — edit stroke control points',animate:'Animate Mode — keyframes and timing',camera:'Camera Mode — Blender camera view · drag to pan · wheel to zoom',mask:'Mask Mode — mask and isolate drawing areas',grease:'Grease Pencil 3D — camera, object transforms, depth, framing · MMB orbit · wheel dolly'};
  msg(names[m]||m);
 }
 function deleteSelected(){const q=selectedObject;if(!q||q.L!==S.l[S.i]||q.f!==S.f)return;const a=dr(q.L,q.f),i=a.indexOf(q.s);if(i<0)return;snap();a.splice(i,1);selectedObject=null;ui()}
