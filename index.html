@@ -404,7 +404,7 @@ TOOLSETS={
 TL=TOOLSETS;
 tf.innerHTML=PR.map(([p,n,s])=>`<label>${n}<input type=number step=${s} data-p=${p}></label>`).join('');
 function renderTools(){
- const items=TOOLSETS[mode]||TOOLSETS.object;
+ const items=window.KeyframeModes?.[mode]?.tools||TOOLSETS[mode]||TOOLSETS.object;
  tb.innerHTML=items.map(([t,g,n])=>`<button data-t="${t}" title="${n}">${g}</button>`).join('');
  tb.dataset.mode=mode;
 }
@@ -441,8 +441,9 @@ addEventListener('keydown',e=>{const T=e.target;if(/^(SELECT|TEXTAREA)$/.test(T.
 function ui(full){if(full)LL();R();DS();const L=S.l[S.i],A=document.activeElement;
  if(L){const t=ev(L,S.f);tf.querySelectorAll('input').forEach(i=>{if(A!=i)i.value=+(+t[i.dataset.p]).toFixed(2)});if(A!=ln)ln.value=L.n;bm.value=L.bm;ie.value=L.e}
  [[fi,S.f],[fps,S.fps],[fa,S.a],[fb,S.b]].forEach(([i,v])=>{if(A!=i)i.value=v});oi.value=S.on;bgc.value=S.bg;
- renderTools();tb.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t==tool));modeSelect.value=mode;modeIcon.textContent=mode==='object'?'●':'◆';
+ renderTools();tb.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t==tool));modeSelect.value=mode;modeIcon.textContent=window.KeyframeModes?.[mode]?.icon||(mode==='object'?'●':'◆');
  clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('keyframe.project.v3',JSON.stringify(S))}catch(e){}},600);sx.textContent=(dirty?'● Unsaved changes':'✓ Saved locally')}
 try{S=JSON.parse(localStorage.getItem('keyframe.project.v3')||localStorage.kf);if(!S.l.length)throw 0}catch(e){S=fresh()}
 S.i=cl(S.i|0,0,S.l.length-1);fit();ui(1);
+addEventListener('keyframe:modes-ready',()=>ui(1));
 </script><script type="module" src="./src/main.js"></script></body></html>
