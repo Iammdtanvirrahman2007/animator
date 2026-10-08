@@ -9,7 +9,7 @@ const norm=a=>vmul(a,1/len(a));
 
 const state={
  yaw:0.35,pitch:-0.22,distance:900,target:[0,0,0],
- focal:720,grid:80,drawPlane:'XY',drag:null,transform:null
+ focal:720,grid:80,drawPlane:'XY',drag:null,transform:null,selected:null,selectedPoint:-1,edit:false
 };
 
 function ensure(S){
@@ -88,6 +88,54 @@ function drawGrid(c){
   }
   c.restore();
 }
+function strokeCenter(s){
+  const pts=worldPoints(s);
+  if(!pts.length)return [0,0,0];
+  return pts.reduce((a,p)=>vadd(a,p),[0,0,0]).map(v=>v/pts.length);
+}
+function hitStroke(s,x,y){
+  const pts=worldPoints(s).map(project).filter(Boolean);
+  let best=null,d=Infinity;
+  for(let i=0;i<pts.length;i++){
+    const q=Math.hypot(pts[i][0]-x,pts[i][1]-y);
+    if(q<d){d=q;best=i}
+  }
+  return d<14?{index:best,d}:null;
+}
+function selectedStroke(S){
+  return state.selected?.s||null;
+}
+function drawSelection(c,S){
+  const s=selectedStroke(S);if(!s)return;
+  const pts=worldPoints(s).map(project).filter(Boolean);if(!pts.length)return;
+  c.save();c.strokeStyle='#ffd54a';c.lineWidth=2;c.setLineDash([6,4]);
+  const box=pts.reduce((a,p)=>({minX:Math.min(a.minX,p[0]),minY:Math.min(a.minY,p[1]),maxX:Math.max(a.maxX,p[0]),maxY:Math.max(a.maxY,p[1])}),{minX:pts[0][0],minY:pts[0][1],maxX:pts[0][0],maxY:pts[0][1]});
+  c.strokeRect(box.minX-6,box.minY-6,box.maxX-box.minX+12,box.maxY-box.minY+12);
+  c.setLineDash([]);
+  c.fillStyle='#ffd54a';
+  pts.forEach((p,i)=>{c.beginPath();c.arc(p[0],p[1],i===state.selectedPoint?5:3,0,Math.PI*2);c.fill()});
+  c.restore();
+}
+function transformStroke(s,type,dx,dy){
+  if(!s?.gp3?.length)return;
+  const center=strokeCenter(s);
+  const cam=camera();
+  if(type==='g'){
+    const amountX=dx/state.distance*1.5,amountY=dy/state.distance*1.5;
+    const delta=vadd(vmul(cam.right,-amountX),vmul(cam.up,amountY));
+    s.gp3=s.gp3.map(p=>vadd(p,delta));
+  }else if(type==='s'){
+    const factor=Math.max(.05,Math.exp(dy*.006));
+    s.gp3=s.gp3.map(p=>vadd(center,vmul(vsub(p,center),factor)));
+  }else if(type==='r'){
+    const a=-dx*.008,ca=Math.cos(a),sa=Math.sin(a);
+    s.gp3=s.gp3.map(p=>{
+      const q=vsub(p,center);
+      const x=q[0]*ca-q[2]*sa,z=q[0]*sa+q[2]*ca;
+      return vadd(center,[x,q[1],z]);
+    });
+  }
+}
 function drawStroke(c,s,i){
   if(!s.p?.length)return;
   const pts=worldPoints(s).map(project).filter(Boolean);
@@ -108,7 +156,14 @@ function draw(ctx,S,f,on){
   const ordered=[];
   S.l.forEach((L,i)=>{if(!L.v)return;const d=L.d?.[f]||[];for(const s of d)ordered.push({s,i,z:Number.isFinite(+s.z)?+s.z:i*45})});
   ordered.sort((a,b)=>b.z-a.z);
+  if(on&&S.f>1){
+    const prev=S.l.flatMap(L=>(L.d?.[S.f-1]||[]).map(s=>({s,i:S.l.indexOf(L)})));
+    const next=S.l.flatMap(L=>(L.d?.[S.f+1]||[]).map(s=>({s,i:S.l.indexOf(L)})));
+    c.save();c.globalAlpha=.18;c.strokeStyle='#6aa9ff';for(const item of prev)drawStroke(c,item.s,item.i);c.restore();
+    c.save();c.globalAlpha=.18;c.strokeStyle='#ff78a8';for(const item of next)drawStroke(c,item.s,item.i);c.restore();
+  }
   for(const item of ordered)drawStroke(c,item.s,item.i);
+  drawSelection(c,S);
   c.restore();
   c.save();
   c.fillStyle='#d9d9d9';c.font='11px system-ui';c.fillText('3D Grease Pencil',14,20);
@@ -135,6 +190,15 @@ function pointerDown(ctx,e){
   if(e.button!==0)return false;
   const S=ctx.S,L=S.l[S.i];if(!L||!L.v)return true;
   const [sx,sy]=screen(e);
+  if(ctx.tool==='select'){
+    let best=null;
+    for(let li=0;li<S.l.length;li++){
+      const layer=S.l[li];if(!layer.v)continue;
+      for(const s of layer.d?.[S.f]||[]){const h=hitStroke(s,sx,sy);if(h&&(!best||h.d<best.h.d))best={s,li,h}}
+    }
+    state.selected=best;state.selectedPoint=best?.h.index??-1;
+    ctx.ui?.();ctx.render();return true;
+  }
   const z=Number.isFinite(+L.gpZ)?+L.gpZ:S.i*45;
   const w=planePoint(sx,sy,state.drawPlane);
   const a=[w[0]+480,270-w[1]];
@@ -148,6 +212,9 @@ function pointerDown(ctx,e){
 function pointerMove(ctx,e){
   if(state.transform){
     const t=state.transform,dx=e.clientX-t.x,dy=e.clientY-t.y;
+    if(state.selected?.s){
+      transformStroke(state.selected.s,t.type,dx,dy);persist(ctx.S);ctx.render();return true;
+    }
     if(t.type==='g'){const cam=camera();state.target=vadd(t.target,vadd(vmul(cam.right,-dx/state.distance*1.5),vmul(cam.up,dy/state.distance*1.5)));}
     if(t.type==='r'){state.yaw=t.yaw-dx*.008;state.pitch=clamp(t.pitch+dy*.006,-1.45,1.45);}
     if(t.type==='s'){state.distance=clamp(t.distance*Math.exp(dy*.006),120,5000);}
@@ -198,20 +265,25 @@ function keydown(ctx,e){
     ctx.ui?.();persist(ctx.S);ctx.render();return true;
   }
   if(k==='g'||k==='r'||k==='s'){
+    if(state.selected?.s){
+      state.transform={type:k,x:e.clientX,y:e.clientY};
+      return true;
+    }
     state.transform={type:k,x:e.clientX,y:e.clientY,yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[...state.target]};
     return true;
   }
-  if(k==='escape'){state.transform=null;return true}
+  if(k==='tab'){state.edit=!state.edit;ctx.ui?.();ctx.render();return true}
+  if(k==='escape'){state.transform=null;state.selected=null;state.selectedPoint=-1;ctx.ui?.();ctx.render();return true}
   return false;
 }
 export const greasePencilMode={
   id:'grease',
   label:'Grease Pencil 3D',
   icon:'✎3D',
-  tools:[['draw','✎','Draw Grease Pencil stroke'],['select','↖','Select Grease Pencil object']],
+  tools:[['draw','✎','Draw Grease Pencil stroke'],['select','↖','Select Grease Pencil object / stroke'],['edit','◆','Edit Grease Pencil points']],
   panels:['3D View','Grease Pencil','Layers','Depth'],
-  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','[':'Move layer back',']':'Move layer forward'},
-  help:'Blender-style 3D viewport for drawing 2D Grease Pencil strokes on layered planes.',
+  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','tab':'Edit/Object mode','g':'Move selected stroke','r':'Rotate selected stroke','s':'Scale selected stroke','[':'Move layer back',']':'Move layer forward'},
+  help:'Blender-style 3D Grease Pencil viewport with object selection, point editing, transforms, planes and onion skin.',
   enter,
   exit,
   pointerDown,
