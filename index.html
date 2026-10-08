@@ -169,7 +169,7 @@ input[type=color]{border-color:#505157!important}
 @media(max-width:760px){#mid{grid-template-columns:40px minmax(0,1fr) 176px}#sd{padding-left:8px;padding-right:8px}}
 @media(max-width:480px){#mid{grid-template-columns:34px minmax(0,1fr) 148px}#sd{padding-left:6px;padding-right:6px}#th{gap:4px}}
 </style></head><body><div id="app">
-<header id="hd"><b class="lg">Keyframe</b><span id="ver">0.3</span><div id="modeWrap" title="Blender-style mode selector"><span id="modeIcon">●</span><select id="modeSelect" aria-label="Editor mode"><option value="object">Object Mode</option><option value="draw">Draw Mode</option><option value="edit">Edit Mode</option><option value="animate">Animate Mode</option><option value="camera">Camera Mode</option><option value="mask">Mask Mode</option></select></div><i></i><button id="bn">New</button><button id="bs">Save</button><button id="bo">Open</button><input id="ld" type="file" accept=".json" hidden><i></i><button id="bu">Undo</button><button id="br">Redo</button><i></i><button id="bp">PNG</button><button id="bw">WebM</button><i></i><button id="bh">Keys ?</button><span id="sx"></span></header>
+<header id="hd"><b class="lg">Keyframe</b><span id="ver">0.3</span><div id="modeWrap" title="Blender-style mode selector"><span id="modeIcon">●</span><select id="modeSelect" aria-label="Editor mode"><option value="object">Object Mode</option><option value="draw">Draw Mode</option><option value="edit">Edit Mode</option><option value="animate">Animate Mode</option><option value="camera">Camera Mode</option><option value="mask">Mask Mode</option><option value="grease">Grease Pencil 3D</option></select></div><i></i><button id="bn">New</button><button id="bs">Save</button><button id="bo">Open</button><input id="ld" type="file" accept=".json" hidden><i></i><button id="bu">Undo</button><button id="br">Redo</button><i></i><button id="bp">PNG</button><button id="bw">WebM</button><i></i><button id="bh">Keys ?</button><span id="sx"></span></header>
 <div id="mid"><nav id="tb"></nav>
 <div id="vp"><canvas id="cv" width="960" height="540"></canvas><pre id="hp" hidden>Space play   ←/→ frame   ↑/↓ prev/next key   Shift+←/→ start/end
 Object: V select/move stroke · Edit: drag control points · Tab switch mode · Delete selected stroke
@@ -202,7 +202,7 @@ Wheel zoom   Alt/Middle-drag pan   Home reset view</pre></div>
 const cx=cv.getContext('2d'),W=960,H=540,ks=o=>Object.keys(o).map(Number).sort((a,b)=>a-b),cl=(v,a,b)=>Math.max(a,Math.min(b,v)),clone=o=>JSON.parse(JSON.stringify(o)),esc=s=>s.replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';');
 let S,hist=[],fut=[],tool='draw',mode='object',selectedObject=null,playing=false,rc=0,view={x:0,y:0,z:1},md=null,mo=null,ms=[W/2,H/2],last=0,saveT,mt,dirty=false;
 let frameSel=new Set(),frameAnchor=null,frameClip=[],timelineDrag=null,pendingShape=null;
-const mk=n=>({n,v:1,bm:'source-over',e:'ease',px:W/2,py:H/2,d:{},k:{}}),fresh=()=>({fps:24,a:1,b:48,f:1,i:0,on:1,bg:'#fbfaf7',camera:{x:W/2,y:H/2,zoom:1,r:0,w:W,h:H,view:false},l:[mk('Layer 1')]});
+const mk=n=>({n,v:1,bm:'source-over',e:'ease',px:W/2,py:H/2,d:{},k:{}}),fresh=()=>({fps:24,a:1,b:48,f:1,i:0,on:1,bg:'#fbfaf7',camera:{x:W/2,y:H/2,zoom:1,r:0,w:W,h:H,view:false},gp3d:{yaw:.35,pitch:-.22,distance:900,target:[0,0,0],focal:720,grid:80,active:false},l:[mk('Layer 1')]});
 const ez={linear:t=>t,ease:t=>t*t*(3-2*t),in:t=>t*t,out:t=>1-(1-t)*(1-t),hold:()=>0,bounce:t=>{const n=7.5625,d=2.75;if(t<1/d)return n*t*t;if(t<2/d)return n*(t-=1.5/d)*t+.75;if(t<2.5/d)return n*(t-=2.25/d)*t+.9375;return n*(t-=2.625/d)*t+.984375}};
 const kf=(L,f)=>ks(L.d).filter(k=>k<=f).pop(),dr=(L,f)=>L.d[kf(L,f)]||[];
 function ev(L,f){const K=ks(L.k);if(!K.length)return{x:0,y:0,r:0,s:1,o:1};const a=K.filter(k=>k<=f).pop(),b=K.find(k=>k>f);
@@ -211,7 +211,7 @@ function ev(L,f){const K=ks(L.k);if(!K.length)return{x:0,y:0,r:0,s:1,o:1};const 
 function loc(L,f,x,y){const t=ev(L,f),a=-t.r*Math.PI/180,dx=x-L.px-t.x,dy=y-L.py-t.y;return[L.px+(dx*Math.cos(a)-dy*Math.sin(a))/t.s,L.py+(dx*Math.sin(a)+dy*Math.cos(a))/t.s]}
 function strokes(c,A,tint){for(const s of A){const p=s.p;if(!p.length)continue;c.beginPath();c.moveTo(p[0][0],p[0][1]);for(let i=1;i<p.length;i++)c.lineTo(p[i][0],p[i][1]);
  if(p.length==1)c.lineTo(p[0][0]+.01,p[0][1]);c.lineWidth=s.w;c.lineCap=c.lineJoin='round';c.strokeStyle=tint||s.c;if(s.f){c.fillStyle=tint||s.c;c.fill()}c.stroke()}}
-function draw(c,f,o){c.globalAlpha=1;c.globalCompositeOperation='source-over';c.fillStyle=S.bg;c.fillRect(0,0,W,H);
+function draw(c,f,o){if(mode==='grease'&&window.GreasePencil3D?.draw){window.GreasePencil3D.draw(c,S,f,o);return}c.globalAlpha=1;c.globalCompositeOperation='source-over';c.fillStyle=S.bg;c.fillRect(0,0,W,H);
  const cam=S.camera||{x:W/2,y:H/2,zoom:1,r:0,w:W,h:H,view:false};
  if(cam.view){c.save();c.translate(W/2,H/2);c.rotate(-cam.r*Math.PI/180);c.scale(cam.zoom,cam.zoom);c.translate(-cam.x,-cam.y)}
  for(const L of S.l){if(!L.v)continue;const t=ev(L,f);c.save();c.globalCompositeOperation=L.bm;c.globalAlpha=t.o;
@@ -238,15 +238,15 @@ function hitStroke(A,x,y){for(let i=A.length-1;i>=0;i--){const p=A[i].p;for(let 
 function nearestPoint(s,x,y){let best=-1,dist=15;for(let i=0;i<s.p.length;i++){const d=Math.hypot(x-s.p[i][0],y-s.p[i][1]);if(d<dist){dist=d;best=i}}return best}
 function setMode(m){
  const prev=mode;
- if(prev==='camera'&&window.KeyframeModes?.camera?.exit)window.KeyframeModes.camera.exit({camera:S.camera});
+ if(prev==='camera'&&window.KeyframeModes?.camera?.exit)window.KeyframeModes.camera.exit({S,camera:S.camera});\n if(prev==='grease'&&window.KeyframeModes?.grease?.exit)window.KeyframeModes.grease.exit({S,render:R,ui});
  mode=m;
- const defaults={object:'select',draw:'draw',edit:'select',animate:'select',camera:'select',mask:'select'};
+ const defaults={object:'select',draw:'draw',edit:'select',animate:'select',camera:'select',mask:'select',grease:'draw'};
  tool=defaults[m]||'select';
- vp.classList.remove('cursor-object','cursor-point','camera-view');
- if(m==='camera'){if(!S.camera)S.camera={x:W/2,y:H/2,zoom:1,r:0,w:W,h:H,view:true};S.camera.view=true;vp.classList.add('camera-view')}
- if(window.KeyframeModes?.[m]?.enter)window.KeyframeModes[m].enter({camera:S.camera});
+ vp.classList.remove('cursor-object','cursor-point','camera-view','grease-pencil-view');
+ if(m==='camera'){if(!S.camera)S.camera={x:W/2,y:H/2,zoom:1,r:0,w:W,h:H,view:true};S.camera.view=true;vp.classList.add('camera-view')}\n if(m==='grease'){if(!S.gp3d)S.gp3d={yaw:.35,pitch:-.22,distance:900,target:[0,0,0],focal:720,grid:80,active:true};S.gp3d.active=true;vp.classList.add('grease-pencil-view')}
+ if(window.KeyframeModes?.[m]?.enter)window.KeyframeModes[m].enter({S,camera:S.camera,render:R,ui});
  ui();
- const names={object:'Object Mode — select, move, rotate and scale',draw:'Draw Mode — brush and shape tools',edit:'Edit Mode — edit stroke control points',animate:'Animate Mode — keyframes and timing',camera:'Camera Mode — Blender camera view · drag to pan · wheel to zoom',mask:'Mask Mode — mask and isolate drawing areas'};
+ const names={object:'Object Mode — select, move, rotate and scale',draw:'Draw Mode — brush and shape tools',edit:'Edit Mode — edit stroke control points',animate:'Animate Mode — keyframes and timing',camera:'Camera Mode — Blender camera view · drag to pan · wheel to zoom',mask:'Mask Mode — mask and isolate drawing areas',grease:'Grease Pencil 3D — draw 2D strokes inside a 3D scene · MMB orbit · wheel dolly'};
  msg(names[m]||m);
 }
 function deleteSelected(){const q=selectedObject;if(!q||q.L!==S.l[S.i]||q.f!==S.f)return;const a=dr(q.L,q.f),i=a.indexOf(q.s);if(i<0)return;snap();a.splice(i,1);selectedObject=null;ui()}
@@ -254,7 +254,7 @@ function snap(){hist.push(JSON.stringify(S));if(hist.length>80)hist.shift();fut=
 function undo(){if(!hist.length)return;fut.push(JSON.stringify(S));const f=S.f;S=JSON.parse(hist.pop());S.f=cl(f,S.a,S.b);ui(1)}
 function redo(){if(!fut.length)return;hist.push(JSON.stringify(S));const f=S.f;S=JSON.parse(fut.pop());S.f=cl(f,S.a,S.b);ui(1)}
 vp.onpointerdown=e=>{vp.setPointerCapture(e.pointerId);
- if(mode==='camera'&&window.KeyframeModes?.camera?.pointerDown){
+ if(mode==='grease'&&window.GreasePencil3D?.pointerDown){const handled=window.GreasePencil3D.pointerDown({S,snap,render:R,ui,col,sz,fl,get md(){return md},set md(v){md=v}},e);if(handled)return}\n if(mode==='camera'&&window.KeyframeModes?.camera?.pointerDown){
   const handled=window.KeyframeModes.camera.pointerDown({
    camera:S.camera,
    screen:e=>[e.clientX,e.clientY],
@@ -292,7 +292,7 @@ vp.onpointerdown=e=>{vp.setPointerCapture(e.pointerId);
  if(!(f in L.d))L.d[f]=ad.checked?clone(dr(L,f)):[];
  const a=loc(L,f,p[0],p[1]),s={c:col.value,w:+sz.value/ev(L,f).s,f:fl.checked,p:[a]};L.d[f].push(s);md={t:tool,s,L,f,a,before};R()};
 vp.onpointermove=e=>{const p=pt(e);ms=p;
- if(mode==='camera'&&window.KeyframeModes?.camera?.pointerMove){
+ if(mode==='grease'&&window.GreasePencil3D?.pointerMove){const handled=window.GreasePencil3D.pointerMove({S,render:R,ui,get md(){return md},set md(v){md=v}},e);if(handled)return}\n if(mode==='camera'&&window.KeyframeModes?.camera?.pointerMove){
   const handled=window.KeyframeModes.camera.pointerMove({camera:S.camera,screen:e=>[e.clientX,e.clientY],get md(){return md},set md(v){md=v},render:R,ui},e);
   if(handled)return;
  }
@@ -320,7 +320,7 @@ vp.onpointermove=e=>{const p=pt(e);ms=p;
  if(md.t=='pendingRotate'){const q=loc(md.L,pendingShape.f,p[0],p[1]),a=Math.atan2(q[1]-md.cy,q[0]-md.cx)-md.start,c=Math.cos(a),s=Math.sin(a);pendingShape.s.p=md.s.map(v=>[md.cx+(v[0]-md.cx)*c-(v[1]-md.cy)*s,md.cy+(v[0]-md.cx)*s+(v[1]-md.cy)*c]);R();return}
  const{s,L,f,a}=md,b=loc(L,f,p[0],p[1]);
  if(md.t=='draw'){const q=s.p[s.p.length-1];if(Math.hypot(b[0]-q[0],b[1]-q[1])>1.5)s.p.push(b)}else s.p=shape(md.t,a,b);R()};
-vp.onpointerup=()=>{if(mode==='camera'&&window.KeyframeModes?.camera?.pointerUp){
+vp.onpointerup=()=>{if(mode==='grease'&&window.GreasePencil3D?.pointerUp){const handled=window.GreasePencil3D.pointerUp({S,render:R,ui,get md(){return md},set md(v){md=v}},e);if(handled)return}\n if(mode==='camera'&&window.KeyframeModes?.camera?.pointerUp){
  const handled=window.KeyframeModes.camera.pointerUp({camera:S.camera,get md(){return md},set md(v){md=v},ui},null);
  if(handled)return
  }
@@ -341,6 +341,7 @@ vp.onpointerup=()=>{if(mode==='camera'&&window.KeyframeModes?.camera?.pointerUp)
  if(md?.t==='objectMove'&&mode==='object'&&window.KeyframeModes?.object?.pointerUp){window.KeyframeModes.object.pointerUp({ui,get md(){return md},set md(v){md=v}});return}
  const was=md&&md.t!='pan',wasPendingMove=md&&md.t=='pendingMove',wasPendingTransform=md&&['pendingScale','pendingRotate'].includes(md.t);md=null;if(wasPendingMove||wasPendingTransform){vp.classList.remove('cursor-grabbing','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');vp.classList.add('cursor-grab')}if(was)ui()};
 vp.onwheel=e=>{e.preventDefault();
+ if(mode==='grease'&&window.GreasePencil3D?.wheel){window.GreasePencil3D.wheel({S,render:R,ui},e);return}
  if(mode==='camera'&&S.camera){
   S.camera.zoom=cl(S.camera.zoom*(e.deltaY<0?1.1:.9),.05,8);R();return;
  }
@@ -429,7 +430,7 @@ TOOLSETS={
  edit:[['select','↖','Select/edit path points (V)'],['pivot','⌖','Set pivot (P)']],
  animate:[['select','↖','Select animated object (V)'],['pivot','⌖','Set pivot (P)']],
  camera:[['select','▣','Select camera frame'],['pivot','⌖','Set camera pivot']],
- mask:[['draw','✎','Draw mask'],['erase','⌫','Erase mask'],['box','▭','Rectangle mask'],['oval','◯','Ellipse mask']]
+ mask:[['draw','✎','Draw mask'],['erase','⌫','Erase mask'],['box','▭','Rectangle mask'],['oval','◯','Ellipse mask']],\n grease:[['draw','✎','Draw Grease Pencil stroke'],['select','↖','Select Grease Pencil object']]
 },
 TL=TOOLSETS;
 tf.innerHTML=PR.map(([p,n,s])=>`<label>${n}<input type=number step=${s} data-p=${p}></label>`).join('');
@@ -458,8 +459,8 @@ addEventListener('keydown',e=>{const T=e.target;if(/^(SELECT|TEXTAREA)$/.test(T.
  const k=e.key.toLowerCase(),c=e.ctrlKey||e.metaKey,L=S.l[S.i];
  if(pendingShape){if(k=='enter'){hist.push(pendingShape.before);if(hist.length>80)hist.shift();fut=[];pendingShape=null;vp.classList.remove('cursor-grab','cursor-grabbing','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');ui();msg('Shape confirmed')}else if(k=='escape'){S=JSON.parse(pendingShape.before);pendingShape=null;vp.classList.remove('cursor-grab','cursor-grabbing','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');ui(1);msg('Shape cancelled')}else if(['arrowleft','arrowright','arrowup','arrowdown'].includes(k)){const dx=k=='arrowleft'?-1:k=='arrowright'?1:0,dy=k=='arrowup'?-1:k=='arrowdown'?1:0,step=e.shiftKey?10:1;for(const p of pendingShape.s.p){p[0]+=dx*step;p[1]+=dy*step}R();e.preventDefault()}else if(k==']'||k=='+'||k=='='){scalePending(1.1);e.preventDefault()}else if(k=='['||k=='-'){scalePending(1/1.1);e.preventDefault()}else e.preventDefault();return}
  if(mo){if(k=='escape')cancelMo();else if(k=='enter')endMo();else if((k=='x'||k=='y')&&mo.m=='g'){mo.ax=mo.ax==k?null:k;mv(ms)}return}
- if(k==='tab'){e.preventDefault();const order=['object','draw','edit','animate','camera','mask'];setMode(order[(order.indexOf(mode)+1)%order.length]);return}
- if(mode==='camera'&&window.KeyframeModes?.camera?.keydown){
+ if(k==='tab'){e.preventDefault();const order=['object','draw','edit','animate','camera','mask','grease'];setMode(order[(order.indexOf(mode)+1)%order.length]);return}
+ if(mode==='grease'&&window.GreasePencil3D?.keydown){if(window.GreasePencil3D.keydown({S,render:R,ui},e))return}\n if(mode==='camera'&&window.KeyframeModes?.camera?.keydown){
   if(window.KeyframeModes.camera.keydown({camera:S.camera,get md(){return md},set md(v){md=v},render:R,ui},e))return;
  }
  if(c&&k=='s'){e.preventDefault();bs.click();return}if(c&&k=='o'){e.preventDefault();bo.click();return}if(c&&k=='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(c&&k=='y'){e.preventDefault();redo();return}
