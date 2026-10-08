@@ -9,7 +9,7 @@ const norm=a=>vmul(a,1/len(a));
 
 const state={
  yaw:0.35,pitch:-0.22,distance:900,target:[0,0,0],
- focal:720,grid:80,drawPlane:'XY',drag:null
+ focal:720,grid:80,drawPlane:'XY',drag:null,transform:null
 };
 
 function ensure(S){
@@ -42,6 +42,14 @@ function project(p){
   const k=state.focal/z;
   return [480+dot(q,cam.right)*k,270-dot(q,cam.up)*k,z];
 }
+function planePoint(x,y,plane){
+  const cam=camera(),nx=(x-480)/state.focal,ny=-(y-270)/state.focal;
+  const dir=norm(vadd(cam.forward,vadd(vmul(cam.right,nx),vmul(cam.up,ny))));
+  const axis=plane==='XZ'?1:plane==='YZ'?0:2;
+  const value=0;
+  const t=(value-cam.pos[axis])/(dir[axis]||1e-6);
+  return vadd(cam.pos,vmul(dir,t));
+}
 function unprojectPlane(x,y,z=0){
   const cam=camera(),nx=(x-480)/state.focal,ny=-(y-270)/state.focal;
   const dir=norm(vadd(cam.forward,vadd(vmul(cam.right,nx),vmul(cam.up,ny))));
@@ -50,8 +58,13 @@ function unprojectPlane(x,y,z=0){
   return [p[0],p[1],z];
 }
 function worldFromStroke(s){
+  if(Array.isArray(s.gp3)&&s.gp3.length)return s.gp3[0];
   const z=Number.isFinite(+s.z)?+s.z:0;
-  return [s.p[0][0]-480,270-s.p[0][1],z];
+  return [s.p?.[0]?.[0]-480,270-(s.p?.[0]?.[1]??270),z];
+}
+function worldPoints(s){
+  if(Array.isArray(s.gp3)&&s.gp3.length)return s.gp3;
+  const w=worldFromStroke(s);return (s.p||[]).map(()=>w);
 }
 function drawGrid(c){
   c.save();
@@ -77,7 +90,7 @@ function drawGrid(c){
 }
 function drawStroke(c,s,i){
   if(!s.p?.length)return;
-  const pts=s.p.map(()=>project(worldFromStroke(s))).filter(Boolean);
+  const pts=worldPoints(s).map(project).filter(Boolean);
   if(!pts.length)return;
   c.beginPath();c.moveTo(pts[0][0],pts[0][1]);
   for(let j=1;j<pts.length;j++)c.lineTo(pts[j][0],pts[j][1]);
@@ -100,7 +113,7 @@ function draw(ctx,S,f,on){
   c.save();
   c.fillStyle='#d9d9d9';c.font='11px system-ui';c.fillText('3D Grease Pencil',14,20);
   c.fillStyle='#9fa4aa';c.fillText('LMB Draw  •  MMB Orbit  •  Shift+MMB Pan  •  Wheel Dolly  •  Numpad 1/3/7 Views',14,38);
-  c.fillText('['+' / '+']'+' layer depth',14,54);
+  c.fillText('['+' / '+']'+' layer depth  •  Plane: '+state.drawPlane+'  •  G/R/S transform',14,54);
   c.restore();
 }
 function screen(e){
@@ -121,11 +134,11 @@ function pointerDown(ctx,e){
   }
   if(e.button!==0)return false;
   const S=ctx.S,L=S.l[S.i];if(!L||!L.v)return true;
-  const [sx,sy]=screen(e),z=Number.isFinite(+L.gpZ)?+L.gpZ:S.i*45;
-  const w=unprojectPlane(sx,sy,z);
+  const [sx,sy]=screen(e);
+  const w=planePoint(sx,sy,state.drawPlane);
   const a=[w[0]+480,270-w[1]];
   if(!(S.f in L.d))L.d[S.f]=[];
-  const s={c:ctx.col?.value||'#1b1b1b',w:+(ctx.sz?.value||4),f:!!ctx.fl?.checked,p:[[a[0],a[1]]],z};
+  const s={c:ctx.col?.value||'#1b1b1b',w:+(ctx.sz?.value||4),f:!!ctx.fl?.checked,p:[[a[0],a[1]]],z,plane:state.drawPlane,gp3:[w]};
   ctx.snap?.();
   L.d[S.f].push(s);
   ctx.md={t:'gpDraw',L,s,z};
@@ -133,6 +146,13 @@ function pointerDown(ctx,e){
 }
 function pointerMove(ctx,e){
   if(!ctx.md)return false;
+  if(state.transform){
+    const t=state.transform,dx=e.clientX-t.x,dy=e.clientY-t.y;
+    if(t.type==='g'){const cam=camera();state.target=vadd(t.target,vadd(vmul(cam.right,-dx/state.distance*1.5),vmul(cam.up,dy/state.distance*1.5)));}
+    if(t.type==='r'){state.yaw=t.yaw-dx*.008;state.pitch=clamp(t.pitch+dy*.006,-1.45,1.45);}
+    if(t.type==='s'){state.distance=clamp(t.distance*Math.exp(dy*.006),120,5000);}
+    persist(ctx.S);ctx.render();return true;
+  }
   if(ctx.md.t==='gpOrbit'){
     state.yaw=ctx.md.yaw-(e.clientX-ctx.md.x)*.008;
     state.pitch=clamp(ctx.md.pitch+(e.clientY-ctx.md.y)*.006,-1.45,1.45);
@@ -146,14 +166,15 @@ function pointerMove(ctx,e){
     persist(ctx.S);ctx.render();return true;
   }
   if(ctx.md.t==='gpDraw'){
-    const [sx,sy]=screen(e),w=unprojectPlane(sx,sy,ctx.md.z),a=[w[0]+480,270-w[1]];
-    const p=ctx.md.s.p,last=p[p.length-1];
-    if(Math.hypot(a[0]-last[0],a[1]-last[1])>1.2)p.push(a);
+    const [sx,sy]=screen(e),w=planePoint(sx,sy,ctx.md.s.plane||state.drawPlane),a=[w[0]+480,270-w[1]];
+    const p=ctx.md.s.p,last=p[p.length-1],gp=ctx.md.s.gp3;
+    if(Math.hypot(a[0]-last[0],a[1]-last[1])>1.2){p.push(a);gp.push(w);}
     persist(ctx.S);ctx.render();return true;
   }
   return false;
 }
 function pointerUp(ctx){
+  if(state.transform){state.transform=null;ctx.ui?.();persist(ctx.S);return true;}
   if(!ctx.md)return false;
   if(ctx.md.t==='gpDraw')ctx.ui?.();
   ctx.md=null;return true;
@@ -168,11 +189,19 @@ function keydown(ctx,e){
   if(k==='3'&&e.code==='Numpad3'){state.yaw=Math.PI/2;state.pitch=0;persist(ctx.S);ctx.render();return true}
   if(k==='7'&&e.code==='Numpad7'){state.yaw=0;state.pitch=Math.PI/2-.001;persist(ctx.S);ctx.render();return true}
   if(k==='0'&&e.code==='Numpad0'){state.yaw=.35;state.pitch=-.22;persist(ctx.S);ctx.render();return true}
+  if(k==='x'||k==='y'||k==='z'){
+    state.drawPlane=k==='x'?'YZ':k==='y'?'XZ':'XY';ctx.ui?.();ctx.render();return true;
+  }
   if(k==='['||k===']'){
     const L=ctx.S.l[ctx.S.i];if(!L)return true;
     L.gpZ=(Number.isFinite(+L.gpZ)?+L.gpZ:ctx.S.i*45)+(k===']'?20:-20);
     ctx.ui?.();persist(ctx.S);ctx.render();return true;
   }
+  if(k==='g'||k==='r'||k==='s'){
+    state.transform={type:k,x:e.clientX,y:e.clientY,yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[...state.target]};
+    return true;
+  }
+  if(k==='escape'){state.transform=null;return true}
   return false;
 }
 export const greasePencilMode={
