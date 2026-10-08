@@ -28,6 +28,7 @@ function ensure(S){
 }
 function persist(S){
   if(!S.gp3d)S.gp3d={};
+  S.l?.forEach((L,i)=>{if(!Number.isFinite(+L.gpZ))L.gpZ=i*45});
   Object.assign(S.gp3d,{yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[...state.target],focal:state.focal,grid:state.grid,pageVisible:state.pageVisible,pageWidth:state.pageWidth,pageHeight:state.pageHeight,pageDepth:state.pageDepth,cameraPath:state.cameraPath.map(p=>[...p]),sceneCamera:{position:[...state.sceneCamera.position],target:[...state.sceneCamera.target],lens:state.sceneCamera.lens,show:state.sceneCamera.show,view:state.sceneCamera.view,selected:state.sceneCamera.selected},active:true});
 }
 function camera(){
@@ -276,7 +277,9 @@ function draw(ctx,S,f,on){
   drawSelection(ctx,S);if(state.edit)drawGizmo(ctx);
   ctx.fillStyle='#d9d9d9';ctx.font='11px system-ui';ctx.fillText('3D Grease Pencil',14,20);
   ctx.fillStyle='#9fa4aa';ctx.fillText('MMB Orbit · Shift+MMB Pan · Wheel Dolly · G/R/S · X/Y/Z constrain · Tab Edit',14,38);
-  ctx.fillText('Plane '+state.drawPlane+' · Numpad 1/3/7/0 · [ ] depth · Shift+D duplicate · Delete remove',14,54);
+  const di=layerDepthInfo(S);
+  ctx.fillText('Plane '+state.drawPlane+' · Numpad 1/3/7/0 · [ ] layer depth · Shift+D duplicate · Delete remove',14,54);
+  if(di){ctx.fillStyle='#f0a040';ctx.fillText('Layer '+di.index+'  '+di.name+'  Depth Z: '+di.depth.toFixed(1),14,86);}
   ctx.fillText('Orange CAMERA = scene camera · dashed line = camera path',14,70);
   ctx.restore();
 }
@@ -374,7 +377,8 @@ function pointerDown(ctx,e){
   const w=planePoint(sx,sy,state.drawPlane),a=[w[0]+480,270-w[1]];
   if(!(S.f in L.d))L.d[S.f]=[];
   ctx.snap?.();
-  const s={c:ctx.col?.value||'#1b1b1b',w:+(ctx.sz?.value||4),f:!!ctx.fl?.checked,p:[[a[0],a[1]]],z:Number.isFinite(+L.gpZ)?+L.gpZ:S.i*45,plane:state.drawPlane,gp3:[w]};
+  if(!Number.isFinite(+L.gpZ))L.gpZ=S.i*45;
+  const s={c:ctx.col?.value||'#1b1b1b',w:+(ctx.sz?.value||4),f:!!ctx.fl?.checked,p:[[a[0],a[1]]],z:+L.gpZ,plane:state.drawPlane,gp3:[w]};
   L.d[S.f].push(s);state.selected={s,li:S.i,h:{index:0,d:0}};state.selectedPoint=0;
   ctx.md={t:'gpDraw',L,s};ctx.render();return true;
 }
@@ -426,6 +430,26 @@ function pointerUp(ctx){
 function wheel(ctx,e){
   e.preventDefault();state.distance=clamp(state.distance*(e.deltaY>0?1.1:.9),100,6000);persist(ctx.S);ctx.render();return true;
 }
+function moveLayerDepth(ctx,delta){
+  const S=ctx.S,li=state.selected?.li??S.i,L=S.l[li];
+  if(!L)return false;
+  if(!Number.isFinite(+L.gpZ))L.gpZ=li*45;
+  const step=state.snap||.5;
+  const d=Math.round(delta/step)*step;
+  if(!d)return true;
+  L.gpZ+=d;
+  for(const frame of Object.keys(L.d||{})){
+    for(const s of L.d[frame]||[]){
+      if(Array.isArray(s.gp3))s.gp3=s.gp3.map(p=>[p[0],p[1],p[2]+d]);
+      s.z=(Number.isFinite(+s.z)?+s.z:L.gpZ)+d;
+    }
+  }
+  persist(S);ctx.ui?.();ctx.render();return true;
+}
+function layerDepthInfo(S){
+  const li=state.selected?.li??S.i,L=S.l[li];
+  return L?{index:li,name:L.n||('Layer '+(li+1)),depth:Number(L.gpZ)||0}:null;
+}
 function duplicateSelected(ctx){
   const s=selectedStroke(),L=ctx.S.l[state.selected?.li??ctx.S.i];if(!s||!L)return;
   ctx.snap?.();const copy=JSON.parse(JSON.stringify(s));copy.gp3=copy.gp3.map(p=>[p[0]+24,p[1]+10,p[2]+12]);copy.p=copy.gp3.map(p=>[p[0]+480,270-p[1]]);
@@ -455,6 +479,8 @@ function keydown(ctx,e){
     if(state.sceneCamera.view){applyCameraView()}else{state.yaw=.35;state.pitch=-.22}
     persist(ctx.S);ctx.render();return true
   }
+  if(k==='['){moveLayerDepth(ctx,-10);return true}
+  if(k===']'){moveLayerDepth(ctx,10);return true}
   if(k==='x'||k==='y'||k==='z'){state.drawPlane=k==='x'?'YZ':k==='y'?'XZ':'XY';ctx.ui?.();ctx.render();return true}
   if(k==='tab'){state.edit=!state.edit;ctx.ui?.();ctx.render();return true}
   if(k==='f'){ctx.tool='fill';ctx.ui?.();ctx.render();return true}
@@ -482,8 +508,8 @@ export const greasePencilMode={
   id:'grease',label:'Grease Pencil 3D',icon:'✎3D',
   tools:[['draw','✎','Draw Grease Pencil stroke'],['fill','▣','Fill enclosed Grease Pencil region'],['cameraPath','⌁','Draw 3D camera path'],['select','↖','Select object / stroke'],['edit','◆','Edit Grease Pencil points']],
   panels:['3D View','Grease Pencil','Layers','Depth'],
-  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Perspective','tab':'Edit/Object','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','shift+d':'Duplicate','delete':'Delete','f':'Fill bucket','c':'Camera path','p':'Show/hide 2D page'},
-  help:'Blender-style 3D Grease Pencil viewport with drawing planes, selection, edit points, transforms, gizmo, depth, onion skin and navigation.',
+  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Camera/Perspective','tab':'Edit/Object','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','[':'Layer depth back',' ]':'Layer depth front','shift+d':'Duplicate','delete':'Delete','f':'Fill bucket','c':'Camera path','p':'Show/hide 2D page'},
+  help:'Blender-style 3D Grease Pencil viewport with real per-layer world depth, camera-relative parallax, drawing planes, selection, edit points, transforms, gizmo, onion skin and navigation. Use [ ] to move the active layer backward/forward on Z.',
   enter,exit,pointerDown,pointerMove,pointerUp,wheel,keydown
 };
 window.GreasePencil3D={draw,pointerDown,pointerMove,pointerUp,wheel,keydown,ensure,state};
