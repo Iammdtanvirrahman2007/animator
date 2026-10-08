@@ -290,12 +290,12 @@ function drawSelection(c,S){
   for(let i=0;i<pts.length;i++){c.fillStyle=i===state.selectedPoint?'#fff':'#f0a040';c.beginPath();c.arc(pts[i][0],pts[i][1],i===state.selectedPoint?5:3,0,Math.PI*2);c.fill()}
   c.restore();
 }
-function frameSelected(){
+function frameSelected(S){
   const s=selectedStroke();
   if(!s)return false;
   const center=strokeCenter(s),d=Math.max(220,Math.min(1600,state.distance*.55));
   state.target=[...center];state.distance=d;
-  persist(window.__gpSceneState||{});return true;
+  persist(S);return true;
 }
 function frameScene(S){
   const pts=[];
@@ -425,7 +425,7 @@ function pointerDown(ctx,e){
     persist(ctx.S);ctx.ui?.();ctx.render();return true;
   }
   if(ctx.tool==='frame'){
-    if(frameSelected())ctx.render();
+    if(frameSelected(S))ctx.render();
     else frameScene(S);
     ctx.ui?.();return true;
   }
@@ -554,7 +554,7 @@ function keydown(ctx,e){
   if(k===']'){moveLayerDepth(ctx,10);return true}
 
   if(k==='tab'){state.edit=!state.edit;ctx.ui?.();ctx.render();return true}
-  if(k==='f'){if(frameSelected())ctx.render();else frameScene(ctx.S);ctx.ui?.();return true}
+  if(k==='f'){if(frameSelected(ctx.S))ctx.render();else frameScene(ctx.S);ctx.ui?.();return true}
   if(k==='c'&&!e.ctrlKey&&!e.metaKey){ctx.tool='cameraPath';ctx.ui?.();ctx.render();return true}
   if(ctx.tool==='cameraPath'&&state.cameraPathSelected>=0&&(k==='arrowleft'||k==='arrowright')&&e.shiftKey){
     const i=state.cameraPathSelected,dir=k==='arrowright'?1:-1,step=e.altKey?10:1,prev=i>0?state.cameraPathFrames[i-1]:state.a,next=i<state.cameraPathFrames.length-1?state.cameraPathFrames[i+1]:state.b;
@@ -585,7 +585,7 @@ export const greasePencilMode={
   tools:[['select','↖','Select 2D scene object / layer'],['camera','▣','Select and drag the 3D scene camera'],['cameraPath','⌁','Create and edit animated camera path'],['frame','⌗','Frame selected object or whole scene'],['orbit','✥','3D orbit navigation'],['pan','✥','3D pan navigation']],
   panels:['3D View','Scene Camera','Camera Path','Layers','Depth'],
   shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Camera View','tab':'Object/Edit','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','[':'Layer depth back',']':'Layer depth front','shift+d':'Duplicate','delete':'Delete','f':'Frame selected','home':'Frame scene','c':'Camera path','shift+←/→':'Path timing','alt+shift+←/→':'10-frame timing','p':'Show/hide 2D page'},
-  help:'Blender-style 3D scene workspace for camera animation, object transforms, depth, framing, orbit/pan navigation and camera paths. Drawing tools are intentionally disabled here.';
+  help:'Blender-style 3D scene workspace for camera animation, object transforms, depth, framing, orbit/pan navigation and camera paths. Drawing tools are intentionally disabled here.',
   enter,exit,pointerDown,pointerMove,pointerUp,wheel,keydown
 };
 window.GreasePencil3D={draw,pointerDown,pointerMove,pointerUp,wheel,keydown,ensure,state};
