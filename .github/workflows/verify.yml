@@ -1,0 +1,78 @@
+name: Verify Animator
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify JavaScript modules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check JavaScript syntax
+        shell: bash
+        run: |
+          set -e
+          find src -type f -name "*.js" -print0 | while IFS= read -r -d '' file; do
+            echo "Checking $file"
+            node --check "$file"
+          done
+
+      - name: Check index.html exists
+        run: test -f index.html
+
+      - name: Check main module
+        run: test -f src/main.js
+
+      - name: Check mode modules
+        shell: bash
+        run: |
+          set -e
+          for file in             src/modes/object-mode.js             src/modes/draw-mode.js             src/modes/edit-mode.js             src/modes/animate-mode.js             src/modes/camera-mode.js             src/modes/mask-mode.js             src/modes/mode-manager.js; do
+            test -f "$file"
+          done
+
+      - name: Verify ES module imports
+        shell: bash
+        run: |
+          set -e
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const files = [];
+          function walk(dir) {
+            for (const entry of fs.readdirSync(dir, {withFileTypes:true})) {
+              const p = dir + '/' + entry.name;
+              if (entry.isDirectory()) walk(p);
+              else if (entry.isFile() && p.endsWith('.js')) files.push(p);
+            }
+          }
+          walk('src');
+          for (const file of files) {
+            const source = fs.readFileSync(file, 'utf8');
+            const re = /from\s+['"]([^'"]+)['"]/g;
+            let m;
+            while ((m = re.exec(source))) {
+              const spec = m[1];
+              if (!spec.startsWith('.')) continue;
+              const resolved = new URL(spec, 'file://' + process.cwd() + '/' + file).pathname;
+              if (!fs.existsSync(resolved)) {
+                throw new Error(`Missing import: ${file} -> ${spec} (${resolved})`);
+              }
+            }
+          }
+          console.log(`Verified ${files.length} JavaScript modules and their relative imports.`);
+          NODE
