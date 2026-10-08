@@ -12,6 +12,7 @@ const state={
   focal:720,grid:80,drawPlane:'XY',
   pageVisible:true,pageWidth:960,pageHeight:540,pageDepth:0,
   cameraPath:[],cameraPathSelected:-1,cameraPathDrawing:false,
+  sceneCamera:{position:[0,0,720],target:[0,0,0],lens:50,show:true},
   selected:null,selectedPoint:-1,edit:false,
   transform:null,drag:null,gizmoSize:70,snap:.5
 };
@@ -23,10 +24,11 @@ function ensure(S){
   state.focal=S.gp3d.focal||720;state.grid=S.gp3d.grid||80;
   state.pageVisible=S.gp3d.pageVisible!==false;state.pageWidth=S.gp3d.pageWidth||960;state.pageHeight=S.gp3d.pageHeight||540;state.pageDepth=S.gp3d.pageDepth||0;
   state.cameraPath=Array.isArray(S.gp3d.cameraPath)?S.gp3d.cameraPath.map(p=>[...p]):[];
+  state.sceneCamera={position:[...(S.gp3d.sceneCamera?.position||[0,0,720])],target:[...(S.gp3d.sceneCamera?.target||[0,0,0])],lens:S.gp3d.sceneCamera?.lens||50,show:S.gp3d.sceneCamera?.show!==false};
 }
 function persist(S){
   if(!S.gp3d)S.gp3d={};
-  Object.assign(S.gp3d,{yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[...state.target],focal:state.focal,grid:state.grid,pageVisible:state.pageVisible,pageWidth:state.pageWidth,pageHeight:state.pageHeight,pageDepth:state.pageDepth,cameraPath:state.cameraPath.map(p=>[...p]),active:true});
+  Object.assign(S.gp3d,{yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[...state.target],focal:state.focal,grid:state.grid,pageVisible:state.pageVisible,pageWidth:state.pageWidth,pageHeight:state.pageHeight,pageDepth:state.pageDepth,cameraPath:state.cameraPath.map(p=>[...p]),sceneCamera:{position:[...state.sceneCamera.position],target:[...state.sceneCamera.target],lens:state.sceneCamera.lens,show:state.sceneCamera.show},active:true});
 }
 function camera(){
   const cp=Math.cos(state.pitch),sp=Math.sin(state.pitch),cy=Math.cos(state.yaw),sy=Math.sin(state.yaw);
@@ -89,6 +91,38 @@ function drawPage(c){
   c.globalAlpha=.65;c.fillStyle='#555';c.font='10px system-ui';
   const label=project([0,-h+18,z]);
   if(label)c.fillText('2D ANIMATION PAGE',label[0]-58,label[1]);
+  c.restore();
+}
+function drawSceneCamera(c){
+  if(!state.sceneCamera.show)return;
+  const cam=state.sceneCamera, pos=cam.position, target=cam.target;
+  const f=norm(vsub(target,pos)), upRef=[0,1,0];
+  let right=norm(cross(f,upRef)); if(length3(right)<.01)right=[1,0,0];
+  const up=norm(cross(right,f));
+  const near=90, far=180, halfH=far*.30, halfW=halfH*1.777;
+  const nearC=vadd(pos,vmul(f,near)), farC=vadd(pos,vmul(f,far));
+  const nc=[
+    vadd(vadd(nearC,vmul(right,-halfW*.5)),vmul(up,halfH*.5)),
+    vadd(vadd(nearC,vmul(right, halfW*.5)),vmul(up,halfH*.5)),
+    vadd(vadd(nearC,vmul(right, halfW*.5)),vmul(up,-halfH*.5)),
+    vadd(vadd(nearC,vmul(right,-halfW*.5)),vmul(up,-halfH*.5))
+  ];
+  const fc=[
+    vadd(vadd(farC,vmul(right,-halfW)),vmul(up,halfH)),
+    vadd(vadd(farC,vmul(right, halfW)),vmul(up,halfH)),
+    vadd(vadd(farC,vmul(right, halfW)),vmul(up,-halfH)),
+    vadd(vadd(farC,vmul(right,-halfW)),vmul(up,-halfH))
+  ];
+  const pp=p=>project(p);
+  const P=nc.map(pp),Q=fc.map(pp),O=pp(pos);
+  if(!O||P.some(x=>!x)||Q.some(x=>!x))return;
+  c.save();c.strokeStyle='#ff9f32';c.fillStyle='#ff9f32';c.lineWidth=2;
+  c.beginPath();c.moveTo(P[0][0],P[0][1]);for(let i=1;i<4;i++)c.lineTo(P[i][0],P[i][1]);c.closePath();c.stroke();
+  c.beginPath();c.moveTo(Q[0][0],Q[0][1]);for(let i=1;i<4;i++)c.lineTo(Q[i][0],Q[i][1]);c.closePath();c.stroke();
+  for(let i=0;i<4;i++){c.beginPath();c.moveTo(P[i][0],P[i][1]);c.lineTo(Q[i][0],Q[i][1]);c.stroke()}
+  c.beginPath();c.arc(O[0],O[1],10,0,Math.PI*2);c.fill();
+  c.fillStyle='#202124';c.font='bold 10px system-ui';c.fillText('CAMERA',O[0]+13,O[1]-12);
+  c.fillStyle='#ffcf8a';c.font='9px system-ui';c.fillText('50mm',O[0]+13,O[1]+1);
   c.restore();
 }
 function drawCameraPath(c){
@@ -223,13 +257,14 @@ function drawOnion(c,S,f){
 }
 function draw(ctx,S,f,on){
   ensure(S);ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.fillStyle='#202124';ctx.fillRect(0,0,960,540);
-  drawPage(ctx);drawGrid(ctx);drawCameraPath(ctx);drawOnion(ctx,S,f);
+  drawPage(ctx);drawGrid(ctx);drawSceneCamera(ctx);drawCameraPath(ctx);drawOnion(ctx,S,f);
   const ordered=[];S.l.forEach((L,i)=>{if(!L.v)return;for(const s of L.d?.[f]||[])ordered.push({s,i,z:Number.isFinite(+s.z)?+s.z:(Number.isFinite(+L.gpZ)?+L.gpZ:i*45)})});
   ordered.sort((a,b)=>b.z-a.z);for(const q of ordered)drawStroke(ctx,q.s);
   drawSelection(ctx,S);if(state.edit)drawGizmo(ctx);
   ctx.fillStyle='#d9d9d9';ctx.font='11px system-ui';ctx.fillText('3D Grease Pencil',14,20);
   ctx.fillStyle='#9fa4aa';ctx.fillText('MMB Orbit · Shift+MMB Pan · Wheel Dolly · G/R/S · X/Y/Z constrain · Tab Edit',14,38);
   ctx.fillText('Plane '+state.drawPlane+' · Numpad 1/3/7/0 · [ ] depth · Shift+D duplicate · Delete remove',14,54);
+  ctx.fillText('Orange CAMERA = scene camera · dashed line = camera path',14,70);
   ctx.restore();
 }
 function screen(e){
