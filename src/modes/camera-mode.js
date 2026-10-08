@@ -1,0 +1,1 @@
+export const cameraMode={id:'camera',label:'Camera Mode',icon:'▣',tools:[['select','▣','Select camera frame'],['pivot','⌖','Set camera pivot']],help:'Camera composition and framing workspace.'};
