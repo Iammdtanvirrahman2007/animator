@@ -347,12 +347,13 @@ bs.onclick=()=>save('animation.json',new Blob([JSON.stringify(S)],{type:'applica
 ld.onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());if(!j.l||!j.l.length)throw 0;snap();S=j;S.i=cl(S.i|0,0,S.l.length-1);S.f=cl(S.f||1,S.a,S.b);dirty=false;ui(1)}catch(x){msg('That is not a Keyframe project file')}e.target.value=''};
 addEventListener('change',e=>e.target.blur());addEventListener('click',e=>{if(e.target.tagName=='BUTTON')e.target.blur()});
 addEventListener('resize',()=>{fit();DS()});
+addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
 addEventListener('keydown',e=>{const T=e.target;if(/^(SELECT|TEXTAREA)$/.test(T.tagName)||T.type=='number'||T.type=='text')return;
  const k=e.key.toLowerCase(),c=e.ctrlKey||e.metaKey,L=S.l[S.i];
  if(pendingShape){if(k=='enter'){hist.push(pendingShape.before);if(hist.length>80)hist.shift();fut=[];pendingShape=null;vp.classList.remove('cursor-grab','cursor-grabbing','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');ui();msg('Shape confirmed')}else if(k=='escape'){S=JSON.parse(pendingShape.before);pendingShape=null;vp.classList.remove('cursor-grab','cursor-grabbing','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');ui(1);msg('Shape cancelled')}else if(['arrowleft','arrowright','arrowup','arrowdown'].includes(k)){const dx=k=='arrowleft'?-1:k=='arrowright'?1:0,dy=k=='arrowup'?-1:k=='arrowdown'?1:0,step=e.shiftKey?10:1;for(const p of pendingShape.s.p){p[0]+=dx*step;p[1]+=dy*step}R();e.preventDefault()}else if(k==']'||k=='+'||k=='='){scalePending(1.1);e.preventDefault()}else if(k=='['||k=='-'){scalePending(1/1.1);e.preventDefault()}else e.preventDefault();return}
  if(mo){if(k=='escape')cancelMo();else if(k=='enter')endMo();else if((k=='x'||k=='y')&&mo.m=='g'){mo.ax=mo.ax==k?null:k;mv(ms)}return}
  if(k==='tab'){e.preventDefault();setMode(mode==='object'?'edit':'object');return}
- if(c&&k=='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(c&&k=='y'){e.preventDefault();redo();return}
+ if(c&&k=='s'){e.preventDefault();bs.click();return}if(c&&k=='o'){e.preventDefault();bo.click();return}if(c&&k=='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(c&&k=='y'){e.preventDefault();redo();return}
  if(c&&k=='c'){e.preventDefault();copyFrames();return}if(c&&k=='v'){e.preventDefault();pasteFrames();return}if(c&&k=='d'){e.preventDefault();duplicateFrames();return}if(c)return;
  const TK={v:'select',d:'draw',e:'erase',l:'line',b:'box',o:'oval',p:'pivot'};if(TK[k]&&!e.shiftKey){tool=TK[k];if(tool==='select')mode='object';ui();return}
  const act={' ':()=>play(!playing),arrowright:()=>go(e.shiftKey?S.b:S.f+1),arrowleft:()=>go(e.shiftKey?S.a:S.f-1),arrowup:()=>jump(1),arrowdown:()=>jump(-1),
