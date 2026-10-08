@@ -394,6 +394,14 @@ function pointerDown(ctx,e){
     return true;
   }
   if(e.button!==0)return false;
+  if(ctx.tool==='orbit'){
+    ctx.md={t:'gpOrbit',x:e.clientX,y:e.clientY,yaw:state.yaw,pitch:state.pitch,target:[...state.target]};
+    return true;
+  }
+  if(ctx.tool==='pan'){
+    ctx.md={t:'gpPan',x:e.clientX,y:e.clientY,target:[...state.target]};
+    return true;
+  }
   const S=ctx.S,[sx,sy]=screen(e);
   if(state.sceneCamera.view){
     if(e.button===0)return true;
