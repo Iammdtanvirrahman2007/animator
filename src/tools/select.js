@@ -1,0 +1,1 @@
+export const selectTool={id:'select',label:'Select',shortcut:'V'};
