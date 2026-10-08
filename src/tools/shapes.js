@@ -1,0 +1,1 @@
+export const shapeTools={line:{id:'line',shortcut:'L'},rectangle:{id:'box',shortcut:'B'},ellipse:{id:'oval',shortcut:'O'}};
