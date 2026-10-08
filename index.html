@@ -12,7 +12,7 @@ button{cursor:pointer}button:hover{background:var(--hv)}button.on{background:var
 :focus-visible{outline:2px solid var(--bl);outline-offset:1px}
 #mid{display:grid;grid-template-columns:44px minmax(0,1fr) 240px;min-height:0}
 #tb{display:flex;flex-direction:column;gap:4px;padding:6px 4px;background:var(--pn)}#tb button{padding:0;height:34px;font-size:16px}
-#vp{position:relative;overflow:hidden;background:#161616;touch-action:none;cursor:crosshair}#vp.cursor-move{cursor:move}#vp.cursor-grab{cursor:grab}#vp.cursor-grabbing{cursor:grabbing}#vp.cursor-scale{cursor:nwse-resize}#vp.cursor-nesw{cursor:nesw-resize}#vp.cursor-ew{cursor:ew-resize}#vp.cursor-ns{cursor:ns-resize}#vp.cursor-rotate{cursor:crosshair}#vp.cursor-object{cursor:move}#vp.cursor-point{cursor:crosshair}
+#vp{position:relative;overflow:hidden;background:#161616;touch-action:none;cursor:crosshair}#vp.cursor-move{cursor:move}#vp.camera-view{cursor:grab}#vp.camera-view:active{cursor:grabbing}#vp.cursor-grab{cursor:grab}#vp.cursor-grabbing{cursor:grabbing}#vp.cursor-scale{cursor:nwse-resize}#vp.cursor-nesw{cursor:nesw-resize}#vp.cursor-ew{cursor:ew-resize}#vp.cursor-ns{cursor:ns-resize}#vp.cursor-rotate{cursor:crosshair}#vp.cursor-object{cursor:move}#vp.cursor-point{cursor:crosshair}
 #cv{position:absolute;left:50%;top:50%;width:960px;height:540px;box-shadow:0 0 0 1px #000,0 8px 30px #0008;cursor:inherit}
 #hp{position:absolute;left:10px;bottom:10px;margin:0;padding:10px 12px;background:#000d;border-radius:6px;font:11px/1.7 ui-monospace,Menlo,monospace}
 #sd{background:var(--pn);overflow:auto;padding:0 8px 8px}
@@ -202,7 +202,7 @@ Wheel zoom   Alt/Middle-drag pan   Home reset view</pre></div>
 const cx=cv.getContext('2d'),W=960,H=540,ks=o=>Object.keys(o).map(Number).sort((a,b)=>a-b),cl=(v,a,b)=>Math.max(a,Math.min(b,v)),clone=o=>JSON.parse(JSON.stringify(o)),esc=s=>s.replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';');
 let S,hist=[],fut=[],tool='draw',mode='object',selectedObject=null,playing=false,rc=0,view={x:0,y:0,z:1},md=null,mo=null,ms=[W/2,H/2],last=0,saveT,mt,dirty=false;
 let frameSel=new Set(),frameAnchor=null,frameClip=[],timelineDrag=null,pendingShape=null;
-const mk=n=>({n,v:1,bm:'source-over',e:'ease',px:W/2,py:H/2,d:{},k:{}}),fresh=()=>({fps:24,a:1,b:48,f:1,i:0,on:1,bg:'#fbfaf7',l:[mk('Layer 1')]});
+const mk=n=>({n,v:1,bm:'source-over',e:'ease',px:W/2,py:H/2,d:{},k:{}}),fresh=()=>({fps:24,a:1,b:48,f:1,i:0,on:1,bg:'#fbfaf7',camera:{x:W/2,y:H/2,zoom:1,r:0,w:W,h:H,view:false},l:[mk('Layer 1')]});
 const ez={linear:t=>t,ease:t=>t*t*(3-2*t),in:t=>t*t,out:t=>1-(1-t)*(1-t),hold:()=>0,bounce:t=>{const n=7.5625,d=2.75;if(t<1/d)return n*t*t;if(t<2/d)return n*(t-=1.5/d)*t+.75;if(t<2.5/d)return n*(t-=2.25/d)*t+.9375;return n*(t-=2.625/d)*t+.984375}};
 const kf=(L,f)=>ks(L.d).filter(k=>k<=f).pop(),dr=(L,f)=>L.d[kf(L,f)]||[];
 function ev(L,f){const K=ks(L.k);if(!K.length)return{x:0,y:0,r:0,s:1,o:1};const a=K.filter(k=>k<=f).pop(),b=K.find(k=>k>f);
@@ -212,10 +212,13 @@ function loc(L,f,x,y){const t=ev(L,f),a=-t.r*Math.PI/180,dx=x-L.px-t.x,dy=y-L.py
 function strokes(c,A,tint){for(const s of A){const p=s.p;if(!p.length)continue;c.beginPath();c.moveTo(p[0][0],p[0][1]);for(let i=1;i<p.length;i++)c.lineTo(p[i][0],p[i][1]);
  if(p.length==1)c.lineTo(p[0][0]+.01,p[0][1]);c.lineWidth=s.w;c.lineCap=c.lineJoin='round';c.strokeStyle=tint||s.c;if(s.f){c.fillStyle=tint||s.c;c.fill()}c.stroke()}}
 function draw(c,f,o){c.globalAlpha=1;c.globalCompositeOperation='source-over';c.fillStyle=S.bg;c.fillRect(0,0,W,H);
+ const cam=S.camera||{x:W/2,y:H/2,zoom:1,r:0,w:W,h:H,view:false};
+ if(cam.view){c.save();c.translate(W/2,H/2);c.rotate(-cam.r*Math.PI/180);c.scale(cam.zoom,cam.zoom);c.translate(-cam.x,-cam.y)}
  for(const L of S.l){if(!L.v)continue;const t=ev(L,f);c.save();c.globalCompositeOperation=L.bm;c.globalAlpha=t.o;
   c.translate(L.px+t.x,L.py+t.y);c.rotate(t.r*Math.PI/180);c.scale(t.s,t.s);c.translate(-L.px,-L.py);
   if(o&&S.on){const K=ks(L.d),ci=K.indexOf(kf(L,f));for(let j=S.on;j>0;j--)for(const d of[-1,1]){const k=K[ci+d*j];if(k!=null){c.globalAlpha=t.o*.35/j;strokes(c,L.d[k],d<0?'#e5484d':'#30a46c')}}c.globalAlpha=t.o}
-  strokes(c,dr(L,f));c.restore()}}
+  strokes(c,dr(L,f));c.restore()}
+ if(cam.view)c.restore()}
 function R(){draw(cx,S.f,!rc);const L=S.l[S.i];if(rc||!L)return;if(pendingShape){const b=pendingBox();if(b){const t=ev(L,pendingShape.f);cx.save();cx.translate(L.px+t.x,L.py+t.y);cx.rotate(t.r*Math.PI/180);cx.scale(t.s,t.s);cx.translate(-L.px,-L.py);cx.strokeStyle='#f08a24';cx.fillStyle='#f08a24';cx.lineWidth=1/t.s;cx.setLineDash([5/t.s,4/t.s]);cx.strokeRect(b.x0-6,b.y0-6,b.x1-b.x0+12,b.y1-b.y0+12);cx.setLineDash([]);cx.beginPath();cx.moveTo(b.cx,b.y0-6);cx.lineTo(b.cx,b.y0-28);cx.stroke();for(const[name,p]of Object.entries(b.handles)){const r=name=='rotate'?4:4.5;cx.fillStyle=name=='rotate'?'#f08a24':'#f4f4f4';cx.fillRect(p[0]-r,p[1]-r,r*2,r*2);cx.strokeStyle='#f08a24';cx.strokeRect(p[0]-r,p[1]-r,r*2,r*2)}cx.restore()}}
  const sel=selectedObject;if(sel&&mode&&sel.L===L&&sel.f===S.f&&dr(L,S.f).includes(sel.s)){const t=ev(L,S.f),p=sel.s.p;cx.save();cx.translate(L.px+t.x,L.py+t.y);cx.rotate(t.r*Math.PI/180);cx.scale(t.s,t.s);cx.translate(-L.px,-L.py);cx.beginPath();if(p.length){cx.moveTo(p[0][0],p[0][1]);for(let i=1;i<p.length;i++)cx.lineTo(p[i][0],p[i][1])}cx.strokeStyle='#f08a24';cx.lineWidth=Math.max(1,sel.s.w+3)/t.s;cx.setLineDash([5/t.s,3/t.s]);cx.stroke();cx.setLineDash([]);if(mode==='edit'){for(const q of p){cx.fillStyle='#f4f4f4';cx.strokeStyle='#f08a24';cx.lineWidth=1/t.s;cx.fillRect(q[0]-3/t.s,q[1]-3/t.s,6/t.s,6/t.s);cx.strokeRect(q[0]-3/t.s,q[1]-3/t.s,6/t.s,6/t.s)}}cx.restore()}
  const t=ev(L,S.f),x=L.px+t.x,y=L.py+t.y;cx.save();cx.strokeStyle='#e87d0d';cx.lineWidth=1.5;cx.beginPath();cx.arc(x,y,6,0,7);cx.moveTo(x-11,y);cx.lineTo(x+11,y);cx.moveTo(x,y-11);cx.lineTo(x,y+11);cx.stroke();cx.restore()}
@@ -234,12 +237,16 @@ function er(e){const L=md.L,k=kf(L,S.f);if(k==null)return;const[x,y]=loc(L,S.f,.
 function hitStroke(A,x,y){for(let i=A.length-1;i>=0;i--){const p=A[i].p;for(let j=0;j<p.length;j++){const a=p[j],b=p[Math.min(j+1,p.length-1)],dx=b[0]-a[0],dy=b[1]-a[1],t=cl(((x-a[0])*dx+(y-a[1])*dy)/(dx*dx+dy*dy||1),0,1);if(Math.hypot(x-a[0]-t*dx,y-a[1]-t*dy)<Math.max(10,A[i].w+7))return A[i]}}return null}
 function nearestPoint(s,x,y){let best=-1,dist=15;for(let i=0;i<s.p.length;i++){const d=Math.hypot(x-s.p[i][0],y-s.p[i][1]);if(d<dist){dist=d;best=i}}return best}
 function setMode(m){
+ const prev=mode;
+ if(prev==='camera'&&window.KeyframeModes?.camera?.exit)window.KeyframeModes.camera.exit({camera:S.camera});
  mode=m;
  const defaults={object:'select',draw:'draw',edit:'select',animate:'select',camera:'select',mask:'select'};
  tool=defaults[m]||'select';
- vp.classList.remove('cursor-object','cursor-point');
+ vp.classList.remove('cursor-object','cursor-point','camera-view');
+ if(m==='camera'){if(!S.camera)S.camera={x:W/2,y:H/2,zoom:1,r:0,w:W,h:H,view:true};S.camera.view=true;vp.classList.add('camera-view')}
+ if(window.KeyframeModes?.[m]?.enter)window.KeyframeModes[m].enter({camera:S.camera});
  ui();
- const names={object:'Object Mode — select, move, rotate and scale',draw:'Draw Mode — brush and shape tools',edit:'Edit Mode — edit stroke control points',animate:'Animate Mode — keyframes and timing',camera:'Camera Mode — frame and camera composition',mask:'Mask Mode — mask and isolate drawing areas'};
+ const names={object:'Object Mode — select, move, rotate and scale',draw:'Draw Mode — brush and shape tools',edit:'Edit Mode — edit stroke control points',animate:'Animate Mode — keyframes and timing',camera:'Camera Mode — Blender camera view · drag to pan · wheel to zoom',mask:'Mask Mode — mask and isolate drawing areas'};
  msg(names[m]||m);
 }
 function deleteSelected(){const q=selectedObject;if(!q||q.L!==S.l[S.i]||q.f!==S.f)return;const a=dr(q.L,q.f),i=a.indexOf(q.s);if(i<0)return;snap();a.splice(i,1);selectedObject=null;ui()}
@@ -247,6 +254,15 @@ function snap(){hist.push(JSON.stringify(S));if(hist.length>80)hist.shift();fut=
 function undo(){if(!hist.length)return;fut.push(JSON.stringify(S));const f=S.f;S=JSON.parse(hist.pop());S.f=cl(f,S.a,S.b);ui(1)}
 function redo(){if(!fut.length)return;hist.push(JSON.stringify(S));const f=S.f;S=JSON.parse(fut.pop());S.f=cl(f,S.a,S.b);ui(1)}
 vp.onpointerdown=e=>{vp.setPointerCapture(e.pointerId);
+ if(mode==='camera'&&window.KeyframeModes?.camera?.pointerDown){
+  const handled=window.KeyframeModes.camera.pointerDown({
+   camera:S.camera,
+   screen:e=>[e.clientX,e.clientY],
+   get md(){return md},set md(v){md=v},
+   render:R,ui,snap
+  },e);
+  if(handled)return;
+ }
  if(pendingShape){if(e.button||e.altKey)return;const L=pendingShape.L,[x,y]=loc(L,pendingShape.f,...pt(e)),b=pendingBox(),h=b&&pendingHandle(b,x,y);if(h=='rotate'){md={t:'pendingRotate',L,s:pendingShape.s.p.map(q=>[...q]),cx:b.cx,cy:b.cy,start:Math.atan2(y-b.cy,x-b.cx)};vp.classList.remove('cursor-grab');vp.classList.add('cursor-rotate');msg('Drag rotation handle · Enter confirm · Esc cancel')}else if(h){const ax=h.includes('w')?b.x1:h.includes('e')?b.x0:b.cx,ay=h.includes('n')?b.y1:h.includes('s')?b.y0:b.cy,hp=b.handles[h];md={t:'pendingScale',L,s:pendingShape.s.p.map(q=>[...q]),anchor:[ax,ay],start:[hp[0]-ax,hp[1]-ay],axes:[h.includes('e')||h.includes('w'),h.includes('n')||h.includes('s')]};vp.classList.remove('cursor-grab');vp.classList.add(h=='e'||h=='w'?'cursor-ew':h=='n'||h=='s'?'cursor-ns':'cursor-scale');msg('Drag handles to resize · Enter confirm · Esc cancel')}else{md={t:'pendingMove',L,s:pendingShape.s,last:[x,y]};vp.classList.remove('cursor-grab');vp.classList.add('cursor-grabbing')}return}
  if(e.button==1||e.altKey){md={t:'pan',x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};return}
  if(mo){endMo();return}
@@ -275,7 +291,12 @@ vp.onpointerdown=e=>{vp.setPointerCapture(e.pointerId);
  if(!shapeTool)snap();if(tool=='erase'){md={t:'erase',L};er(e);return}
  if(!(f in L.d))L.d[f]=ad.checked?clone(dr(L,f)):[];
  const a=loc(L,f,p[0],p[1]),s={c:col.value,w:+sz.value/ev(L,f).s,f:fl.checked,p:[a]};L.d[f].push(s);md={t:tool,s,L,f,a,before};R()};
-vp.onpointermove=e=>{const p=pt(e);ms=p;if(mo){mv(p);return}if(!md&&(mode==='edit'||tool==='select')){vp.classList.remove('cursor-object','cursor-point');const L=S.l[S.i];if(L){const q=loc(L,S.f,p[0],p[1]),hit=hitStroke(dr(L,S.f),q[0],q[1]);if(mode==='edit'&&selectedObject&&selectedObject.L===L&&selectedObject.f===S.f&&nearestPoint(selectedObject.s,q[0],q[1])>=0)vp.classList.add('cursor-point');else if(hit)vp.classList.add('cursor-object')}return}if(!md){if(pendingShape){const b=pendingBox(),q=loc(pendingShape.L,pendingShape.f,p[0],p[1]),h=b&&pendingHandle(b,q[0],q[1]);vp.classList.remove('cursor-grab','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');const cls=h=='rotate'?'cursor-rotate':h=='e'||h=='w'?'cursor-ew':h=='n'||h=='s'?'cursor-ns':h=='nw'||h=='se'?'cursor-scale':h?'cursor-nesw':'cursor-grab';vp.classList.add(cls)}return}
+vp.onpointermove=e=>{const p=pt(e);ms=p;
+ if(mode==='camera'&&window.KeyframeModes?.camera?.pointerMove){
+  const handled=window.KeyframeModes.camera.pointerMove({camera:S.camera,screen:e=>[e.clientX,e.clientY],get md(){return md},set md(v){md=v},render:R,ui},e);
+  if(handled)return;
+ }
+ if(mo){mv(p);return}if(!md&&(mode==='edit'||tool==='select')){vp.classList.remove('cursor-object','cursor-point');const L=S.l[S.i];if(L){const q=loc(L,S.f,p[0],p[1]),hit=hitStroke(dr(L,S.f),q[0],q[1]);if(mode==='edit'&&selectedObject&&selectedObject.L===L&&selectedObject.f===S.f&&nearestPoint(selectedObject.s,q[0],q[1])>=0)vp.classList.add('cursor-point');else if(hit)vp.classList.add('cursor-object')}return}if(!md){if(pendingShape){const b=pendingBox(),q=loc(pendingShape.L,pendingShape.f,p[0],p[1]),h=b&&pendingHandle(b,q[0],q[1]);vp.classList.remove('cursor-grab','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');const cls=h=='rotate'?'cursor-rotate':h=='e'||h=='w'?'cursor-ew':h=='n'||h=='s'?'cursor-ns':h=='nw'||h=='se'?'cursor-scale':h?'cursor-nesw':'cursor-grab';vp.classList.add(cls)}return}
  if(md.t=='pan'){view.x=md.vx+e.clientX-md.x;view.y=md.vy+e.clientY-md.y;V();return}
  if(md.t=='erase'){er(e);return}
  if(mode==='draw'&&window.KeyframeModes?.draw?.pointerMove){
@@ -299,7 +320,11 @@ vp.onpointermove=e=>{const p=pt(e);ms=p;if(mo){mv(p);return}if(!md&&(mode==='edi
  if(md.t=='pendingRotate'){const q=loc(md.L,pendingShape.f,p[0],p[1]),a=Math.atan2(q[1]-md.cy,q[0]-md.cx)-md.start,c=Math.cos(a),s=Math.sin(a);pendingShape.s.p=md.s.map(v=>[md.cx+(v[0]-md.cx)*c-(v[1]-md.cy)*s,md.cy+(v[0]-md.cx)*s+(v[1]-md.cy)*c]);R();return}
  const{s,L,f,a}=md,b=loc(L,f,p[0],p[1]);
  if(md.t=='draw'){const q=s.p[s.p.length-1];if(Math.hypot(b[0]-q[0],b[1]-q[1])>1.5)s.p.push(b)}else s.p=shape(md.t,a,b);R()};
-vp.onpointerup=()=>{if(md&&md.t=='draw'){const p=md.s.p;for(let k=0;k<+sm.value;k++)for(let i=1;i<p.length-1;i++)p[i]=[(p[i-1][0]+p[i][0]*2+p[i+1][0])/4,(p[i-1][1]+p[i][1]*2+p[i+1][1])/4]}
+vp.onpointerup=()=>{if(mode==='camera'&&window.KeyframeModes?.camera?.pointerUp){
+ const handled=window.KeyframeModes.camera.pointerUp({camera:S.camera,get md(){return md},set md(v){md=v},ui},null);
+ if(handled)return
+ }
+ if(md&&md.t=='draw'){const p=md.s.p;for(let k=0;k<+sm.value;k++)for(let i=1;i<p.length-1;i++)p[i]=[(p[i-1][0]+p[i][0]*2+p[i+1][0])/4,(p[i-1][1]+p[i][1]*2+p[i+1][1])/4]}
  if(md&&['line','box','oval'].includes(md.t)){pendingShape={before:md.before,L:md.L,s:md.s,f:md.f};md=null;vp.classList.remove('cursor-grabbing');vp.classList.add('cursor-grab');R();msg('Drag to reposition · Enter to confirm · Esc to cancel');return}
  if(mode==='draw'&&window.KeyframeModes?.draw?.pointerUp){
  const handled=window.KeyframeModes.draw.pointerUp({
@@ -315,7 +340,11 @@ vp.onpointerup=()=>{if(md&&md.t=='draw'){const p=md.s.p;for(let k=0;k<+sm.value;
 }
  if(md?.t==='objectMove'&&mode==='object'&&window.KeyframeModes?.object?.pointerUp){window.KeyframeModes.object.pointerUp({ui,get md(){return md},set md(v){md=v}});return}
  const was=md&&md.t!='pan',wasPendingMove=md&&md.t=='pendingMove',wasPendingTransform=md&&['pendingScale','pendingRotate'].includes(md.t);md=null;if(wasPendingMove||wasPendingTransform){vp.classList.remove('cursor-grabbing','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');vp.classList.add('cursor-grab')}if(was)ui()};
-vp.onwheel=e=>{e.preventDefault();if(pendingShape){scalePending(e.deltaY<0?1.08:1/1.08);msg('Scale preview · Enter confirm · Esc cancel');return}view.z=cl(view.z*(e.deltaY<0?1.1:.9),.1,8);V()};
+vp.onwheel=e=>{e.preventDefault();
+ if(mode==='camera'&&S.camera){
+  S.camera.zoom=cl(S.camera.zoom*(e.deltaY<0?1.1:.9),.05,8);R();return;
+ }
+ if(pendingShape){scalePending(e.deltaY<0?1.08:1/1.08);msg('Scale preview · Enter confirm · Esc cancel');return}view.z=cl(view.z*(e.deltaY<0?1.1:.9),.1,8);V()};
 vp.oncontextmenu=e=>{e.preventDefault();if(mo)cancelMo()};
 function startMo(m){const L=S.l[S.i];if(!L||mo)return;snap();mo={m,L,t:ev(L,S.f),k0:clone(L.k),s:[...ms],ax:null};vp.classList.remove('cursor-grab','cursor-grabbing');vp.classList.add('cursor-move');msg({g:'Move',r:'Rotate',s:'Scale'}[m]+' — click to confirm, Esc to cancel')}
 function mv(p){const{m,L,t,s,ax}=mo,px=L.px+t.x,py=L.py+t.y,u={};
@@ -430,6 +459,9 @@ addEventListener('keydown',e=>{const T=e.target;if(/^(SELECT|TEXTAREA)$/.test(T.
  if(pendingShape){if(k=='enter'){hist.push(pendingShape.before);if(hist.length>80)hist.shift();fut=[];pendingShape=null;vp.classList.remove('cursor-grab','cursor-grabbing','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');ui();msg('Shape confirmed')}else if(k=='escape'){S=JSON.parse(pendingShape.before);pendingShape=null;vp.classList.remove('cursor-grab','cursor-grabbing','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');ui(1);msg('Shape cancelled')}else if(['arrowleft','arrowright','arrowup','arrowdown'].includes(k)){const dx=k=='arrowleft'?-1:k=='arrowright'?1:0,dy=k=='arrowup'?-1:k=='arrowdown'?1:0,step=e.shiftKey?10:1;for(const p of pendingShape.s.p){p[0]+=dx*step;p[1]+=dy*step}R();e.preventDefault()}else if(k==']'||k=='+'||k=='='){scalePending(1.1);e.preventDefault()}else if(k=='['||k=='-'){scalePending(1/1.1);e.preventDefault()}else e.preventDefault();return}
  if(mo){if(k=='escape')cancelMo();else if(k=='enter')endMo();else if((k=='x'||k=='y')&&mo.m=='g'){mo.ax=mo.ax==k?null:k;mv(ms)}return}
  if(k==='tab'){e.preventDefault();const order=['object','draw','edit','animate','camera','mask'];setMode(order[(order.indexOf(mode)+1)%order.length]);return}
+ if(mode==='camera'&&window.KeyframeModes?.camera?.keydown){
+  if(window.KeyframeModes.camera.keydown({camera:S.camera,get md(){return md},set md(v){md=v},render:R,ui},e))return;
+ }
  if(c&&k=='s'){e.preventDefault();bs.click();return}if(c&&k=='o'){e.preventDefault();bo.click();return}if(c&&k=='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(c&&k=='y'){e.preventDefault();redo();return}
  if(c&&k=='c'){e.preventDefault();copyFrames();return}if(c&&k=='v'){e.preventDefault();pasteFrames();return}if(c&&k=='d'){e.preventDefault();duplicateFrames();return}if(c)return;
  const TK={v:'select',d:'draw',e:'erase',l:'line',b:'box',o:'oval',p:'pivot'};if(TK[k]&&!e.shiftKey){tool=TK[k];if(['draw','erase','line','box','oval'].includes(tool)&&mode==='object')setMode('draw');else ui();return}
