@@ -24,12 +24,13 @@ function ensure(S){
   state.focal=S.gp3d.focal||720;state.grid=S.gp3d.grid||80;
   state.pageVisible=S.gp3d.pageVisible!==false;state.pageWidth=S.gp3d.pageWidth||960;state.pageHeight=S.gp3d.pageHeight||540;state.pageDepth=S.gp3d.pageDepth||0;
   state.cameraPath=Array.isArray(S.gp3d.cameraPath)?S.gp3d.cameraPath.map(p=>[...p]):[];
+  state.cameraPathFrames=Array.isArray(S.gp3d.cameraPathFrames)&&S.gp3d.cameraPathFrames.length===state.cameraPath.length?S.gp3d.cameraPathFrames.map(v=>cl(Math.round(+v)||S.a,S.a,S.b)):state.cameraPath.map((_,i)=>Math.round(S.a+(S.b-S.a)*(i/Math.max(1,state.cameraPath.length-1))));
   state.sceneCamera={position:[...(S.gp3d.sceneCamera?.position||[0,0,720])],target:[...(S.gp3d.sceneCamera?.target||[0,0,0])],lens:S.gp3d.sceneCamera?.lens||50,show:S.gp3d.sceneCamera?.show!==false,view:!!S.gp3d.sceneCamera?.view,selected:!!S.gp3d.sceneCamera?.selected};
 }
 function persist(S){
   if(!S.gp3d)S.gp3d={};
   S.l?.forEach((L,i)=>{if(!Number.isFinite(+L.gpZ))L.gpZ=i*45});
-  Object.assign(S.gp3d,{yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[...state.target],focal:state.focal,grid:state.grid,pageVisible:state.pageVisible,pageWidth:state.pageWidth,pageHeight:state.pageHeight,pageDepth:state.pageDepth,cameraPath:state.cameraPath.map(p=>[...p]),sceneCamera:{position:[...state.sceneCamera.position],target:[...state.sceneCamera.target],lens:state.sceneCamera.lens,show:state.sceneCamera.show,view:state.sceneCamera.view,selected:state.sceneCamera.selected},active:true});
+  Object.assign(S.gp3d,{yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[...state.target],focal:state.focal,grid:state.grid,pageVisible:state.pageVisible,pageWidth:state.pageWidth,pageHeight:state.pageHeight,pageDepth:state.pageDepth,cameraPath:state.cameraPath.map(p=>[...p]),cameraPathFrames:[...state.cameraPathFrames],sceneCamera:{position:[...state.sceneCamera.position],target:[...state.sceneCamera.target],lens:state.sceneCamera.lens,show:state.sceneCamera.show,view:state.sceneCamera.view,selected:state.sceneCamera.selected},active:true});
 }
 function camera(){
   const cp=Math.cos(state.pitch),sp=Math.sin(state.pitch),cy=Math.cos(state.yaw),sy=Math.sin(state.yaw);
@@ -160,20 +161,44 @@ function drawCameraPath(c){
   if(state.cameraPath.length<1)return;
   const pts=state.cameraPath.map(project);
   c.save();c.lineCap='round';c.lineJoin='round';
-  c.strokeStyle='#f0a040';c.lineWidth=3;
-  c.setLineDash([8,5]);
-  c.beginPath();
-  let started=false;
+  c.strokeStyle='#f0a040';c.lineWidth=3;c.setLineDash([8,5]);
+  c.beginPath();let started=false;
   for(const p of pts){if(!p)continue;if(!started){c.moveTo(p[0],p[1]);started=true}else c.lineTo(p[0],p[1])}
-  if(started)c.stroke();
-  c.setLineDash([]);
+  if(started)c.stroke();c.setLineDash([]);
   pts.forEach((p,i)=>{
     if(!p)return;
-    c.fillStyle=i===state.cameraPathSelected?'#fff':'#f0a040';
-    c.strokeStyle='#222';c.lineWidth=2;c.beginPath();c.arc(p[0],p[1],i===state.cameraPathSelected?7:5,0,Math.PI*2);c.fill();c.stroke();
-    c.fillStyle='#f0a040';c.font='9px system-ui';c.fillText(String(i+1),p[0]+7,p[1]-7);
+    c.fillStyle=i===state.cameraPathSelected?'#fff':'#f0a040';c.strokeStyle='#222';c.lineWidth=2;
+    c.beginPath();c.arc(p[0],p[1],i===state.cameraPathSelected?7:5,0,Math.PI*2);c.fill();c.stroke();
+    c.fillStyle='#f0a040';c.font='9px system-ui';c.fillText(String(i+1)+' · F'+state.cameraPathFrames[i],p[0]+7,p[1]-7);
   });
   c.restore();
+}
+function sortCameraPath(){
+  const a=state.cameraPath.map((p,i)=>({p,f:state.cameraPathFrames[i]??state.a,i})).sort((x,y)=>x.f-y.f);
+  state.cameraPath=a.map(x=>x.p);state.cameraPathFrames=a.map(x=>cl(x.f,state.a,state.b));
+}
+function sampleCameraPath(frame){
+  if(state.cameraPath.length<1)return false;
+  sortCameraPath();
+  if(state.cameraPath.length===1){
+    state.sceneCamera.position=[...state.cameraPath[0]];
+    return true;
+  }
+  const fs=state.cameraPathFrames, pts=state.cameraPath;
+  if(frame<=fs[0]){state.sceneCamera.position=[...pts[0]]}
+  else if(frame>=fs[fs.length-1]){state.sceneCamera.position=[...pts.at(-1)]}
+  else{
+    let j=1;while(j<fs.length&&frame>fs[j])j++;
+    const a=fs[j-1],b=fs[j],t=(frame-a)/Math.max(1,b-a);
+    const p=pts[j-1].map((v,k)=>v+(pts[j][k]-v)*t);
+    state.sceneCamera.position=p;
+  }
+  const idx=state.cameraPathFrames.findIndex(v=>v>=frame);
+  const j=cl(idx<0?fs.length-1:idx,1,pts.length-1);
+  const look=norm(vsub(pts[j],pts[j-1]));
+  const distance=Math.max(120,length3(vsub(state.sceneCamera.target,state.sceneCamera.position)));
+  state.sceneCamera.target=vadd(state.sceneCamera.position,vmul(look,distance));
+  return true;
 }
 function drawGrid(c){
   c.save();c.lineWidth=1;
@@ -287,7 +312,8 @@ function drawOnion(c,S,f){
   c.save();c.globalAlpha=.22;for(const q of K){const old=q.s.c;q.s.c=q.col;drawStroke(c,q.s);q.s.c=old}c.restore();
 }
 function draw(ctx,S,f,on){
-  ensure(S);ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.fillStyle='#202124';ctx.fillRect(0,0,960,540);
+  ensure(S);
+  if(state.cameraPath.length>0&&!state.sceneCamera.selected)sampleCameraPath(f);ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.fillStyle='#202124';ctx.fillRect(0,0,960,540);
   drawPage(ctx);drawGrid(ctx);drawSceneCamera(ctx);drawCameraPath(ctx);drawOnion(ctx,S,f);
   const ordered=[];S.l.forEach((L,i)=>{if(!L.v)return;for(const s of L.d?.[f]||[])ordered.push({s,i,z:Number.isFinite(+s.z)?+s.z:(Number.isFinite(+L.gpZ)?+L.gpZ:i*45)})});
   ordered.sort((a,b)=>b.z-a.z);for(const q of ordered)drawStroke(ctx,q.s);
@@ -366,11 +392,11 @@ function pointerDown(ctx,e){
   }
   if(ctx.tool==='cameraPath'){
     const w=planePoint(sx,sy,'XY',0);
-    if(e.shiftKey){
-      state.cameraPath=[];
-    }
+    if(e.shiftKey){state.cameraPath=[];state.cameraPathFrames=[]}
     state.cameraPath.push(w);
-    state.cameraPathSelected=state.cameraPath.length-1;
+    const n=state.cameraPath.length-1;
+    state.cameraPathFrames.push(n===0?S.a:cl(Math.max(S.a,(state.cameraPathFrames[n-1]??S.a)+1),S.a,S.b));
+    state.cameraPathSelected=n;
     persist(ctx.S);ctx.ui?.();ctx.render();return true;
   }
   if(ctx.tool==='fill'){
@@ -503,6 +529,10 @@ function keydown(ctx,e){
   if(k==='tab'){state.edit=!state.edit;ctx.ui?.();ctx.render();return true}
   if(k==='f'){ctx.tool='fill';ctx.ui?.();ctx.render();return true}
   if(k==='c'&&!e.ctrlKey&&!e.metaKey){ctx.tool='cameraPath';ctx.ui?.();ctx.render();return true}
+  if(ctx.tool==='cameraPath'&&state.cameraPathSelected>=0&&(k==='arrowleft'||k==='arrowright')&&e.shiftKey){
+    const i=state.cameraPathSelected,dir=k==='arrowright'?1:-1,step=e.altKey?10:1,prev=i>0?state.cameraPathFrames[i-1]:state.a,next=i<state.cameraPathFrames.length-1?state.cameraPathFrames[i+1]:state.b;
+    state.cameraPathFrames[i]=cl(state.cameraPathFrames[i]+dir*step,prev+1,next-1);persist(ctx.S);ctx.ui?.();ctx.render();return true;
+  }
   if(k==='p'&&!e.ctrlKey&&!e.metaKey){state.pageVisible=!state.pageVisible;ctx.ui?.();ctx.render();return true}
   if(k==='g'||k==='r'||k==='s'){
     if(state.sceneCamera.selected){
@@ -526,8 +556,8 @@ export const greasePencilMode={
   id:'grease',label:'Grease Pencil 3D',icon:'✎3D',
   tools:[['draw','✎','Draw Grease Pencil stroke'],['fill','▣','Fill enclosed Grease Pencil region'],['cameraPath','⌁','Draw 3D camera path'],['select','↖','Select object / stroke'],['edit','◆','Edit Grease Pencil points']],
   panels:['3D View','Grease Pencil','Layers','Depth'],
-  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Camera/Perspective','tab':'Edit/Object','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','[':'Layer depth back',']':'Layer depth front','shift+d':'Duplicate','delete':'Delete','f':'Fill bucket','c':'Camera path','p':'Show/hide 2D page'},
-  help:'Blender-style 3D Grease Pencil viewport with real per-layer world depth, camera-relative parallax, drawing planes, selection, edit points, transforms, gizmo, onion skin and navigation. Use [ ] to move the active layer backward/forward on Z.',
+  shortcuts:{'numpad1':'Front','numpad3':'Right','numpad7':'Top','numpad0':'Camera/Perspective','tab':'Edit/Object','g':'Move','r':'Rotate','s':'Scale','x/y/z':'Axis constraint','[':'Layer depth back',']':'Layer depth front','shift+d':'Duplicate','delete':'Delete','f':'Fill bucket','c':'Camera path','shift+←/→':'Path timing','alt+shift+←/→':'10-frame timing','p':'Show/hide 2D page'},
+  help:'Blender-style 3D Grease Pencil viewport with per-layer depth, camera-relative parallax and animated camera paths. Each path point has a frame; select a point and use Shift+Left/Right to increase or decrease the gap.',
   enter,exit,pointerDown,pointerMove,pointerUp,wheel,keydown
 };
 window.GreasePencil3D={draw,pointerDown,pointerMove,pointerUp,wheel,keydown,ensure,state};
