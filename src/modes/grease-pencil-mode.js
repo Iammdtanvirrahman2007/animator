@@ -13,9 +13,14 @@ const state={
 };
 
 function ensure(S){
-  if(!S.gp3d)S.gp3d={yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[0,0,0],focal:720,grid:80};
+  if(!S.gp3d)S.gp3d={yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[0,0,0],focal:720,grid:80,active:true};
   state.yaw=S.gp3d.yaw;state.pitch=S.gp3d.pitch;state.distance=S.gp3d.distance;
   state.target=S.gp3d.target||[0,0,0];state.focal=S.gp3d.focal||720;state.grid=S.gp3d.grid||80;
+}
+function persist(S){
+  if(!S.gp3d)S.gp3d={};
+  S.gp3d.yaw=state.yaw;S.gp3d.pitch=state.pitch;S.gp3d.distance=state.distance;
+  S.gp3d.target=[...state.target];S.gp3d.focal=state.focal;S.gp3d.grid=state.grid;S.gp3d.active=true;
 }
 function camera(){
   const cp=Math.cos(state.pitch),sp=Math.sin(state.pitch),cy=Math.cos(state.yaw),sy=Math.sin(state.yaw);
@@ -104,13 +109,10 @@ function screen(e){
 }
 function enter(ctx){
   ensure(ctx.S);
-  ctx.S.gp3d.active=true;
+  ctx.S.gp3d.active=true;persist(ctx.S);
 }
 function exit(ctx){
-  if(ctx.S?.gp3d){
-    ctx.S.gp3d.yaw=state.yaw;ctx.S.gp3d.pitch=state.pitch;ctx.S.gp3d.distance=state.distance;
-    ctx.S.gp3d.target=[...state.target];
-  }
+  if(ctx.S?.gp3d)persist(ctx.S);
 }
 function pointerDown(ctx,e){
   if(e.button===1){
@@ -124,8 +126,9 @@ function pointerDown(ctx,e){
   const a=[w[0]+480,270-w[1]];
   if(!(S.f in L.d))L.d[S.f]=[];
   const s={c:ctx.col?.value||'#1b1b1b',w:+(ctx.sz?.value||4),f:!!ctx.fl?.checked,p:[[a[0],a[1]]],z};
+  ctx.snap?.();
   L.d[S.f].push(s);
-  ctx.snap?.();ctx.md={t:'gpDraw',L,s,z};
+  ctx.md={t:'gpDraw',L,s,z};
   ctx.render();return true;
 }
 function pointerMove(ctx,e){
@@ -133,20 +136,20 @@ function pointerMove(ctx,e){
   if(ctx.md.t==='gpOrbit'){
     state.yaw=ctx.md.yaw-(e.clientX-ctx.md.x)*.008;
     state.pitch=clamp(ctx.md.pitch+(e.clientY-ctx.md.y)*.006,-1.45,1.45);
-    ctx.render();return true;
+    persist(ctx.S);ctx.render();return true;
   }
   if(ctx.md.t==='gpPan'){
     const dx=(e.clientX-ctx.md.x)/Math.max(.1,ctx.S.gp3d?.distance/720||1);
     const dy=(e.clientY-ctx.md.y)/Math.max(.1,ctx.S.gp3d?.distance/720||1);
     const cam=camera();
     state.target=vadd(ctx.md.target,vadd(vmul(cam.right,-dx),vmul(cam.up,dy)));
-    ctx.render();return true;
+    persist(ctx.S);ctx.render();return true;
   }
   if(ctx.md.t==='gpDraw'){
     const [sx,sy]=screen(e),w=unprojectPlane(sx,sy,ctx.md.z),a=[w[0]+480,270-w[1]];
     const p=ctx.md.s.p,last=p[p.length-1];
     if(Math.hypot(a[0]-last[0],a[1]-last[1])>1.2)p.push(a);
-    ctx.render();return true;
+    persist(ctx.S);ctx.render();return true;
   }
   return false;
 }
@@ -157,18 +160,18 @@ function pointerUp(ctx){
 }
 function wheel(ctx,e){
   state.distance=cl(state.distance*(e.deltaY>0?1.1:.9),120,5000);
-  ctx.render();return true;
+  persist(ctx.S);ctx.render();return true;
 }
 function keydown(ctx,e){
   const k=e.key.toLowerCase();
-  if(k==='1'&&e.code==='Numpad1'){state.yaw=0;state.pitch=0;ctx.render();return true}
-  if(k==='3'&&e.code==='Numpad3'){state.yaw=Math.PI/2;state.pitch=0;ctx.render();return true}
-  if(k==='7'&&e.code==='Numpad7'){state.yaw=0;state.pitch=-Math.PI/2+.001;ctx.render();return true}
-  if(k==='0'&&e.code==='Numpad0'){state.yaw=.35;state.pitch=-.22;ctx.render();return true}
+  if(k==='1'&&e.code==='Numpad1'){state.yaw=0;state.pitch=0;persist(ctx.S);ctx.render();return true}
+  if(k==='3'&&e.code==='Numpad3'){state.yaw=Math.PI/2;state.pitch=0;persist(ctx.S);ctx.render();return true}
+  if(k==='7'&&e.code==='Numpad7'){state.yaw=0;state.pitch=-Math.PI/2+.001;persist(ctx.S);ctx.render();return true}
+  if(k==='0'&&e.code==='Numpad0'){state.yaw=.35;state.pitch=-.22;persist(ctx.S);ctx.render();return true}
   if(k==='['||k===']'){
     const L=ctx.S.l[ctx.S.i];if(!L)return true;
     L.gpZ=(Number.isFinite(+L.gpZ)?+L.gpZ:ctx.S.i*45)+(k===']'?20:-20);
-    ctx.ui?.();ctx.render();return true;
+    ctx.ui?.();persist(ctx.S);ctx.render();return true;
   }
   return false;
 }
