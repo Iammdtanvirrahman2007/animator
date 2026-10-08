@@ -1,0 +1,2 @@
+/* Modular workspace styles. Legacy inline styles remain in index.html during migration. */
+.mode-workspace{display:flex;align-items:center;gap:6px}.mode-workspace button{cursor:pointer}.tool-group{display:flex;flex-direction:column;gap:4px}
