@@ -128,6 +128,14 @@ body{font-size:12px;letter-spacing:.05px}
 #hd .lg{font-size:13px;font-weight:750;letter-spacing:.45px}
 #hd button{min-height:24px;padding:3px 9px;font-size:11px}
 #hd .mode-btn{min-width:48px}#hd .mode-btn.on{background:#f08018;border-color:#ff9c3a;color:#1e1f22}
+#modeWrap{display:flex;align-items:center;gap:5px;height:26px;padding:2px 7px;background:#3b3c40;border:1px solid #4a4b50;border-radius:3px;box-shadow:inset 0 1px #ffffff08}
+#modeWrap:hover{background:#4c4d52;border-color:#5a5b60}
+#modeIcon{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;color:#e98220;font-size:11px}
+#modeSelect{appearance:none;-webkit-appearance:none;border:0!important;background:transparent!important;box-shadow:none!important;padding:1px 18px 1px 0!important;min-height:20px!important;font-weight:600;font-size:11px;cursor:pointer}
+#modeSelect:focus{outline:none!important;box-shadow:none!important}
+#modeWrap{position:relative}
+#modeWrap::after{content:"▾";position:absolute;right:6px;top:5px;color:#bfc1c5;font-size:10px;pointer-events:none}
+
 
 #sx{font-size:11px;color:#c3c5ca}#ver{font-size:9px;color:#8f939a;background:#242529;border:1px solid #44454a;border-radius:3px;padding:2px 5px;margin-right:2px}
 #mid{grid-template-columns:46px minmax(0,1fr) 248px}
@@ -160,7 +168,7 @@ input[type=color]{border-color:#505157!important}
 @media(max-width:760px){#mid{grid-template-columns:40px minmax(0,1fr) 176px}#sd{padding-left:8px;padding-right:8px}}
 @media(max-width:480px){#mid{grid-template-columns:34px minmax(0,1fr) 148px}#sd{padding-left:6px;padding-right:6px}#th{gap:4px}}
 </style></head><body><div id="app">
-<header id="hd"><b class="lg">Keyframe</b><span id="ver">0.3</span><button id="modeObject" class="mode-btn on" title="Select and move strokes (Tab: switch mode)">Object</button><button id="modeEdit" class="mode-btn" title="Edit stroke control points (Tab: switch mode)">Edit</button><i></i><button id="bn">New</button><button id="bs">Save</button><button id="bo">Open</button><input id="ld" type="file" accept=".json" hidden><i></i><button id="bu">Undo</button><button id="br">Redo</button><i></i><button id="bp">PNG</button><button id="bw">WebM</button><i></i><button id="bh">Keys ?</button><span id="sx"></span></header>
+<header id="hd"><b class="lg">Keyframe</b><span id="ver">0.3</span><div id="modeWrap" title="Blender-style mode selector"><span id="modeIcon">●</span><select id="modeSelect" aria-label="Editor mode"><option value="object">Object Mode</option><option value="edit">Edit Mode</option></select></div><i></i><button id="bn">New</button><button id="bs">Save</button><button id="bo">Open</button><input id="ld" type="file" accept=".json" hidden><i></i><button id="bu">Undo</button><button id="br">Redo</button><i></i><button id="bp">PNG</button><button id="bw">WebM</button><i></i><button id="bh">Keys ?</button><span id="sx"></span></header>
 <div id="mid"><nav id="tb"></nav>
 <div id="vp"><canvas id="cv" width="960" height="540"></canvas><pre id="hp" hidden>Space play   ←/→ frame   ↑/↓ prev/next key   Shift+←/→ start/end
 Object: V select/move stroke · Edit: drag control points · Tab switch mode · Delete selected stroke
@@ -335,7 +343,7 @@ tf.innerHTML=PR.map(([p,n,s])=>`<label>${n}<input type=number step=${s} data-p=$
 tb.innerHTML=TL.map(([t,g,n])=>`<button data-t="${t}" title="${n}">${g}</button>`).join('');
 tf.onchange=e=>{const p=e.target.dataset.p;let v=parseFloat(e.target.value);if(!p||isNaN(v))return;if(p=='o')v=cl(v,0,1);if(p=='s')v=Math.max(.01,v);setP(p,v)};
 tb.onclick=e=>{const t=e.target.dataset.t;if(t){tool=t;if(t==='select')mode='object';ui()}};
-modeObject.onclick=()=>setMode('object');modeEdit.onclick=()=>setMode('edit');
+modeSelect.onchange=e=>setMode(e.target.value);
 ll.onclick=e=>{const d=e.target.closest('[data-i]');if(!d)return;if(e.target.dataset.v!=null){snap();S.l[e.target.dataset.v].v=e.target.checked?1:0;ui(1);return}S.i=+d.dataset.i;ui(1)};
 ln.oninput=e=>{S.l[S.i].n=e.target.value;LL();DS()};
 bm.onchange=e=>{snap();S.l[S.i].bm=e.target.value;ui()};ie.onchange=e=>{snap();S.l[S.i].e=e.target.value;ui()};
@@ -365,7 +373,7 @@ addEventListener('keydown',e=>{const T=e.target;if(/^(SELECT|TEXTAREA)$/.test(T.
 function ui(full){if(full)LL();R();DS();const L=S.l[S.i],A=document.activeElement;
  if(L){const t=ev(L,S.f);tf.querySelectorAll('input').forEach(i=>{if(A!=i)i.value=+(+t[i.dataset.p]).toFixed(2)});if(A!=ln)ln.value=L.n;bm.value=L.bm;ie.value=L.e}
  [[fi,S.f],[fps,S.fps],[fa,S.a],[fb,S.b]].forEach(([i,v])=>{if(A!=i)i.value=v});oi.value=S.on;bgc.value=S.bg;
- tb.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t==tool));modeObject.classList.toggle('on',mode==='object');modeEdit.classList.toggle('on',mode==='edit');
+ tb.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t==tool));modeSelect.value=mode;modeIcon.textContent=mode==='object'?'●':'◆';
  clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('keyframe.project.v3',JSON.stringify(S))}catch(e){}},600);sx.textContent=(dirty?'● Unsaved changes':'✓ Saved locally')}
 try{S=JSON.parse(localStorage.getItem('keyframe.project.v3')||localStorage.kf);if(!S.l.length)throw 0}catch(e){S=fresh()}
 S.i=cl(S.i|0,0,S.l.length-1);fit();ui(1);
