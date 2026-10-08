@@ -21,10 +21,12 @@ function ensure(S){
   state.yaw=S.gp3d.yaw??state.yaw;state.pitch=S.gp3d.pitch??state.pitch;
   state.distance=S.gp3d.distance??state.distance;state.target=[...(S.gp3d.target||[0,0,0])];
   state.focal=S.gp3d.focal||720;state.grid=S.gp3d.grid||80;
+  state.pageVisible=S.gp3d.pageVisible!==false;state.pageWidth=S.gp3d.pageWidth||960;state.pageHeight=S.gp3d.pageHeight||540;state.pageDepth=S.gp3d.pageDepth||0;
+  state.cameraPath=Array.isArray(S.gp3d.cameraPath)?S.gp3d.cameraPath.map(p=>[...p]):[];
 }
 function persist(S){
   if(!S.gp3d)S.gp3d={};
-  Object.assign(S.gp3d,{yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[...state.target],focal:state.focal,grid:state.grid,active:true});
+  Object.assign(S.gp3d,{yaw:state.yaw,pitch:state.pitch,distance:state.distance,target:[...state.target],focal:state.focal,grid:state.grid,pageVisible:state.pageVisible,pageWidth:state.pageWidth,pageHeight:state.pageHeight,pageDepth:state.pageDepth,cameraPath:state.cameraPath.map(p=>[...p]),active:true});
 }
 function camera(){
   const cp=Math.cos(state.pitch),sp=Math.sin(state.pitch),cy=Math.cos(state.yaw),sy=Math.sin(state.yaw);
