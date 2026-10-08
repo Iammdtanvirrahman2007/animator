@@ -471,7 +471,12 @@ async function mp4(){
   const data=await ff.readFile('animation.mp4');
   await ff.deleteFile('animation.webm').catch(()=>{});
   await ff.deleteFile('animation.mp4').catch(()=>{});
-  await save('animation.mp4',new Blob([data.buffer],{type:'video/mp4'}));
+  const mp4Blob=new Blob([data.buffer],{type:'video/mp4'});
+  await save('animation.mp4',mp4Blob);
+  const url=URL.createObjectURL(mp4Blob);
+  const a=document.createElement('a');a.href=url;a.download='animation.mp4';a.style.display='none';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),10000);
   msg('MP4 export complete');
  }catch(e){
   rc=0;playing=false;S.f=oldFrame;ui();
