@@ -1,0 +1,1 @@
+export const eraserTool={id:'erase',label:'Eraser',shortcut:'E'};
