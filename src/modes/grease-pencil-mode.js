@@ -135,6 +135,7 @@ function pointerDown(ctx,e){
   if(e.button!==0)return false;
   const S=ctx.S,L=S.l[S.i];if(!L||!L.v)return true;
   const [sx,sy]=screen(e);
+  const z=Number.isFinite(+L.gpZ)?+L.gpZ:S.i*45;
   const w=planePoint(sx,sy,state.drawPlane);
   const a=[w[0]+480,270-w[1]];
   if(!(S.f in L.d))L.d[S.f]=[];
@@ -145,7 +146,6 @@ function pointerDown(ctx,e){
   ctx.render();return true;
 }
 function pointerMove(ctx,e){
-  if(!ctx.md)return false;
   if(state.transform){
     const t=state.transform,dx=e.clientX-t.x,dy=e.clientY-t.y;
     if(t.type==='g'){const cam=camera();state.target=vadd(t.target,vadd(vmul(cam.right,-dx/state.distance*1.5),vmul(cam.up,dy/state.distance*1.5)));}
