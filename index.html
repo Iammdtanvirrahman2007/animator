@@ -168,7 +168,7 @@ input[type=color]{border-color:#505157!important}
 @media(max-width:760px){#mid{grid-template-columns:40px minmax(0,1fr) 176px}#sd{padding-left:8px;padding-right:8px}}
 @media(max-width:480px){#mid{grid-template-columns:34px minmax(0,1fr) 148px}#sd{padding-left:6px;padding-right:6px}#th{gap:4px}}
 </style></head><body><div id="app">
-<header id="hd"><b class="lg">Keyframe</b><span id="ver">0.3</span><div id="modeWrap" title="Blender-style mode selector"><span id="modeIcon">●</span><select id="modeSelect" aria-label="Editor mode"><option value="object">Object Mode</option><option value="edit">Edit Mode</option></select></div><i></i><button id="bn">New</button><button id="bs">Save</button><button id="bo">Open</button><input id="ld" type="file" accept=".json" hidden><i></i><button id="bu">Undo</button><button id="br">Redo</button><i></i><button id="bp">PNG</button><button id="bw">WebM</button><i></i><button id="bh">Keys ?</button><span id="sx"></span></header>
+<header id="hd"><b class="lg">Keyframe</b><span id="ver">0.3</span><div id="modeWrap" title="Blender-style mode selector"><span id="modeIcon">●</span><select id="modeSelect" aria-label="Editor mode"><option value="object">Object Mode</option><option value="draw">Draw Mode</option><option value="edit">Edit Mode</option><option value="animate">Animate Mode</option><option value="camera">Camera Mode</option><option value="mask">Mask Mode</option></select></div><i></i><button id="bn">New</button><button id="bs">Save</button><button id="bo">Open</button><input id="ld" type="file" accept=".json" hidden><i></i><button id="bu">Undo</button><button id="br">Redo</button><i></i><button id="bp">PNG</button><button id="bw">WebM</button><i></i><button id="bh">Keys ?</button><span id="sx"></span></header>
 <div id="mid"><nav id="tb"></nav>
 <div id="vp"><canvas id="cv" width="960" height="540"></canvas><pre id="hp" hidden>Space play   ←/→ frame   ↑/↓ prev/next key   Shift+←/→ start/end
 Object: V select/move stroke · Edit: drag control points · Tab switch mode · Delete selected stroke
@@ -232,7 +232,15 @@ function scalePending(factor){if(!pendingShape)return;const b=pendingBox();if(!b
 function er(e){const L=md.L,k=kf(L,S.f);if(k==null)return;const[x,y]=loc(L,S.f,...pt(e)),r=Math.max(12,+sz.value*1.5);L.d[k]=L.d[k].filter(s=>!s.p.some(q=>Math.hypot(q[0]-x,q[1]-y)<r));R()}
 function hitStroke(A,x,y){for(let i=A.length-1;i>=0;i--){const p=A[i].p;for(let j=0;j<p.length;j++){const a=p[j],b=p[Math.min(j+1,p.length-1)],dx=b[0]-a[0],dy=b[1]-a[1],t=cl(((x-a[0])*dx+(y-a[1])*dy)/(dx*dx+dy*dy||1),0,1);if(Math.hypot(x-a[0]-t*dx,y-a[1]-t*dy)<Math.max(10,A[i].w+7))return A[i]}}return null}
 function nearestPoint(s,x,y){let best=-1,dist=15;for(let i=0;i<s.p.length;i++){const d=Math.hypot(x-s.p[i][0],y-s.p[i][1]);if(d<dist){dist=d;best=i}}return best}
-function setMode(m){mode=m;tool='select';vp.classList.remove('cursor-object','cursor-point');ui();msg(m==='object'?'Object Mode — select and move strokes':'Edit Mode — drag control points')}
+function setMode(m){
+ mode=m;
+ const defaults={object:'select',draw:'draw',edit:'select',animate:'select',camera:'select',mask:'select'};
+ tool=defaults[m]||'select';
+ vp.classList.remove('cursor-object','cursor-point');
+ ui();
+ const names={object:'Object Mode — select, move, rotate and scale',draw:'Draw Mode — brush and shape tools',edit:'Edit Mode — edit stroke control points',animate:'Animate Mode — keyframes and timing',camera:'Camera Mode — frame and camera composition',mask:'Mask Mode — mask and isolate drawing areas'};
+ msg(names[m]||m);
+}
 function deleteSelected(){const q=selectedObject;if(!q||q.L!==S.l[S.i]||q.f!==S.f)return;const a=dr(q.L,q.f),i=a.indexOf(q.s);if(i<0)return;snap();a.splice(i,1);selectedObject=null;ui()}
 function snap(){hist.push(JSON.stringify(S));if(hist.length>80)hist.shift();fut=[];dirty=true}
 function undo(){if(!hist.length)return;fut.push(JSON.stringify(S));const f=S.f;S=JSON.parse(hist.pop());S.f=cl(f,S.a,S.b);ui(1)}
@@ -338,11 +346,25 @@ ds.onpointerdown=e=>{ds.setPointerCapture(e.pointerId);const r=ds.getBoundingCli
 ds.onpointermove=e=>{if(e.buttons&&timelineDrag)setTimelineFrame(e);else if(e.buttons){const r=ds.getBoundingClientRect(),u=(r.width-104)/(S.b-S.a+1);go(S.a+(e.clientX-r.left-96)/u-.5)}};
 ds.onpointerup=()=>{if(timelineDrag){const delta=S.f-timelineDrag.origin;timelineDrag=null;if(delta)moveFrames(delta);else DS()}};
 function setTimelineFrame(e){const r=ds.getBoundingClientRect(),u=(r.width-104)/(S.b-S.a+1);go(S.a+(e.clientX-r.left-96)/u-.5)}
-const PR=[['x','X',1],['y','Y',1],['r','Rotation°',1],['s','Scale',.05],['o','Opacity',.05]],TL=[['select','↖','Select object (V)'],['draw','✎','Draw (D)'],['erase','⌫','Erase strokes (E)'],['line','╱','Line (L)'],['box','▭','Box (B)'],['oval','◯','Ellipse (O)'],['pivot','⌖','Set pivot (P)']];
+const PR=[['x','X',1],['y','Y',1],['r','Rotation°',1],['s','Scale',.05],['o','Opacity',.05]],
+TOOLSETS={
+ object:[['select','↖','Select object (V)'],['pivot','⌖','Set pivot (P)']],
+ draw:[['draw','✎','Draw brush (D)'],['erase','⌫','Erase strokes (E)'],['line','╱','Line (L)'],['box','▭','Rectangle (B)'],['oval','◯','Ellipse (O)']],
+ edit:[['select','↖','Select/edit path points (V)'],['pivot','⌖','Set pivot (P)']],
+ animate:[['select','↖','Select animated object (V)'],['pivot','⌖','Set pivot (P)']],
+ camera:[['select','▣','Select camera frame'],['pivot','⌖','Set camera pivot']],
+ mask:[['draw','✎','Draw mask'],['erase','⌫','Erase mask'],['box','▭','Rectangle mask'],['oval','◯','Ellipse mask']]
+},
+TL=TOOLSETS;
 tf.innerHTML=PR.map(([p,n,s])=>`<label>${n}<input type=number step=${s} data-p=${p}></label>`).join('');
-tb.innerHTML=TL.map(([t,g,n])=>`<button data-t="${t}" title="${n}">${g}</button>`).join('');
+function renderTools(){
+ const items=TOOLSETS[mode]||TOOLSETS.object;
+ tb.innerHTML=items.map(([t,g,n])=>`<button data-t="${t}" title="${n}">${g}</button>`).join('');
+ tb.dataset.mode=mode;
+}
+renderTools();
 tf.onchange=e=>{const p=e.target.dataset.p;let v=parseFloat(e.target.value);if(!p||isNaN(v))return;if(p=='o')v=cl(v,0,1);if(p=='s')v=Math.max(.01,v);setP(p,v)};
-tb.onclick=e=>{const t=e.target.dataset.t;if(t){tool=t;if(t==='select')mode='object';ui()}};
+tb.onclick=e=>{const t=e.target.dataset.t;if(t){tool=t;ui()}};
 modeSelect.onchange=e=>setMode(e.target.value);
 ll.onclick=e=>{const d=e.target.closest('[data-i]');if(!d)return;if(e.target.dataset.v!=null){snap();S.l[e.target.dataset.v].v=e.target.checked?1:0;ui(1);return}S.i=+d.dataset.i;ui(1)};
 ln.oninput=e=>{S.l[S.i].n=e.target.value;LL();DS()};
@@ -360,10 +382,10 @@ addEventListener('keydown',e=>{const T=e.target;if(/^(SELECT|TEXTAREA)$/.test(T.
  const k=e.key.toLowerCase(),c=e.ctrlKey||e.metaKey,L=S.l[S.i];
  if(pendingShape){if(k=='enter'){hist.push(pendingShape.before);if(hist.length>80)hist.shift();fut=[];pendingShape=null;vp.classList.remove('cursor-grab','cursor-grabbing','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');ui();msg('Shape confirmed')}else if(k=='escape'){S=JSON.parse(pendingShape.before);pendingShape=null;vp.classList.remove('cursor-grab','cursor-grabbing','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');ui(1);msg('Shape cancelled')}else if(['arrowleft','arrowright','arrowup','arrowdown'].includes(k)){const dx=k=='arrowleft'?-1:k=='arrowright'?1:0,dy=k=='arrowup'?-1:k=='arrowdown'?1:0,step=e.shiftKey?10:1;for(const p of pendingShape.s.p){p[0]+=dx*step;p[1]+=dy*step}R();e.preventDefault()}else if(k==']'||k=='+'||k=='='){scalePending(1.1);e.preventDefault()}else if(k=='['||k=='-'){scalePending(1/1.1);e.preventDefault()}else e.preventDefault();return}
  if(mo){if(k=='escape')cancelMo();else if(k=='enter')endMo();else if((k=='x'||k=='y')&&mo.m=='g'){mo.ax=mo.ax==k?null:k;mv(ms)}return}
- if(k==='tab'){e.preventDefault();setMode(mode==='object'?'edit':'object');return}
+ if(k==='tab'){e.preventDefault();const order=['object','draw','edit','animate','camera','mask'];setMode(order[(order.indexOf(mode)+1)%order.length]);return}
  if(c&&k=='s'){e.preventDefault();bs.click();return}if(c&&k=='o'){e.preventDefault();bo.click();return}if(c&&k=='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(c&&k=='y'){e.preventDefault();redo();return}
  if(c&&k=='c'){e.preventDefault();copyFrames();return}if(c&&k=='v'){e.preventDefault();pasteFrames();return}if(c&&k=='d'){e.preventDefault();duplicateFrames();return}if(c)return;
- const TK={v:'select',d:'draw',e:'erase',l:'line',b:'box',o:'oval',p:'pivot'};if(TK[k]&&!e.shiftKey){tool=TK[k];if(tool==='select')mode='object';ui();return}
+ const TK={v:'select',d:'draw',e:'erase',l:'line',b:'box',o:'oval',p:'pivot'};if(TK[k]&&!e.shiftKey){tool=TK[k];if(['draw','erase','line','box','oval'].includes(tool)&&mode==='object')setMode('draw');else ui();return}
  const act={' ':()=>play(!playing),arrowright:()=>go(e.shiftKey?S.b:S.f+1),arrowleft:()=>go(e.shiftKey?S.a:S.f-1),arrowup:()=>jump(1),arrowdown:()=>jump(-1),
   g:()=>startMo('g'),r:()=>startMo('r'),s:()=>startMo('s'),
   i:()=>{if(!L)return;snap();if(e.altKey)delete L.k[S.f];else L.k[S.f]=ev(L,S.f);ui(1)},
@@ -373,7 +395,7 @@ addEventListener('keydown',e=>{const T=e.target;if(/^(SELECT|TEXTAREA)$/.test(T.
 function ui(full){if(full)LL();R();DS();const L=S.l[S.i],A=document.activeElement;
  if(L){const t=ev(L,S.f);tf.querySelectorAll('input').forEach(i=>{if(A!=i)i.value=+(+t[i.dataset.p]).toFixed(2)});if(A!=ln)ln.value=L.n;bm.value=L.bm;ie.value=L.e}
  [[fi,S.f],[fps,S.fps],[fa,S.a],[fb,S.b]].forEach(([i,v])=>{if(A!=i)i.value=v});oi.value=S.on;bgc.value=S.bg;
- tb.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t==tool));modeSelect.value=mode;modeIcon.textContent=mode==='object'?'●':'◆';
+ renderTools();tb.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t==tool));modeSelect.value=mode;modeIcon.textContent=mode==='object'?'●':'◆';
  clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('keyframe.project.v3',JSON.stringify(S))}catch(e){}},600);sx.textContent=(dirty?'● Unsaved changes':'✓ Saved locally')}
 try{S=JSON.parse(localStorage.getItem('keyframe.project.v3')||localStorage.kf);if(!S.l.length)throw 0}catch(e){S=fresh()}
 S.i=cl(S.i|0,0,S.l.length-1);fit();ui(1);
