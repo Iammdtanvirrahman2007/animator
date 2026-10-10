@@ -278,10 +278,16 @@ function pointerDown(event) {
   if (!layer || !layer.v) return status('Select a visible layer before editing.');
   if (mode === 'camera') { beginCameraGesture(event); return; }
   if (mode === 'mask') {
+    const masks = project.masks[project.f] || (project.masks[project.f] = []);
+    if (tool === 'erase') {
+      const hit = hitStroke(masks, point[0], point[1], 16);
+      if (hit) { takeSnapshot(); project.masks[project.f] = masks.filter(mask => mask !== hit); render(); }
+      pointer = { type: 'mask-erase' }; return;
+    }
     takeSnapshot();
-    const mask = project.masks[project.f] || (project.masks[project.f] = []);
-    const draft = createShape(tool === 'ellipse' ? 'ellipse' : tool === 'rect' ? 'rect' : 'path', point, point);
-    maskDraft = { mask, draft }; mask.push(draft); pointer = { type: 'mask', start: point };
+    const shape = createShape(tool === 'ellipse' ? 'ellipse' : tool === 'rect' ? 'rect' : 'path', point, point);
+    const draft = { ...shape, c: '#e45858', w: 2, fill: false, closed: shape.closed };
+    maskDraft = { mask: masks, draft }; masks.push(draft); pointer = { type: 'mask', start: point };
     render(); return;
   }
   const strokes = layer.d[project.f] || [];
@@ -373,10 +379,20 @@ function pointerMove(event) {
     render(); return;
   }
   if (pointer.type === 'mask') {
-    const shape = createShape(tool === 'ellipse' ? 'ellipse' : tool === 'rect' ? 'rect' : 'path', pointer.start, point);
-    maskDraft.draft.p = shape.p;
-    if (shape.shape !== 'path') maskDraft.draft.shape = shape.shape;
+    if (tool === 'pencil') {
+      const points = maskDraft.draft.p, last = points[points.length - 1];
+      if (Math.hypot(point[0] - last[0], point[1] - last[1]) > 1.2) points.push(point);
+    } else {
+      const shape = createShape(tool === 'ellipse' ? 'ellipse' : tool === 'rect' ? 'rect' : 'path', pointer.start, point);
+      maskDraft.draft.p = shape.p;
+      if (shape.shape !== 'path') maskDraft.draft.shape = shape.shape;
+    }
     render(); return;
+  }
+  if (pointer.type === 'mask-erase') {
+    const masks = project.masks[project.f] || [], hit = hitStroke(masks, point[0], point[1], 16);
+    if (hit) { project.masks[project.f] = masks.filter(mask => mask !== hit); render(); }
+    return;
   }
   if (pointer.type === 'erase') {
     const layer = activeLayer(), strokes = layer.d[project.f] || [], hit = hitStroke(strokes, point[0], point[1], 16);
