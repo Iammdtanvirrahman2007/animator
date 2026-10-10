@@ -392,7 +392,7 @@ function screen(e){
 }
 function beginTransform(ctx,type,axis=null,e){
   const s=selectedStroke();if(!s)return false;
-  ctx.snap?.();state.transform={type,axis,x:e.clientX,y:e.clientY,original:JSON.stringify(s),center:strokeCenter(s)};
+  ctx.snap?.();state.transform={type,axis,x:Number.isFinite(e?.clientX)?e.clientX:null,y:Number.isFinite(e?.clientY)?e.clientY:null,original:JSON.stringify(s),center:strokeCenter(s)};
   return true;
 }
 function axisVector(axis){return axis==='x'?[1,0,0]:axis==='y'?[0,1,0]:axis==='z'?[0,0,1]:null}
@@ -459,7 +459,7 @@ function pointerDown(ctx,e){
       const cam=state.sceneCamera;
       ctx.md={t:'cameraTransform',type:'g',x:e.clientX,y:e.clientY,position:[...cam.position],target:[...cam.target],lens:cam.lens,yaw:cameraViewTransform().yaw,pitch:cameraViewTransform().pitch,distance:cameraViewTransform().distance};
     }
-    ctx.ui?.();ctx.render();return true;
+    persist(S);ctx.ui?.();ctx.render();return true;
   }
   if(ctx.tool==='camera'&&!state.edit){
     placeCameraAtViewport(S,sx,sy);
@@ -513,6 +513,7 @@ function pointerDown(ctx,e){
 }
 function pointerMove(ctx,e){
   if(state.sceneCamera.selected&&(ctx.md?.t==='cameraTransform'||ctx.md?.t==='cameraControl')){
+    if(!Number.isFinite(ctx.md.x)||!Number.isFinite(ctx.md.y)){ctx.md.x=e.clientX;ctx.md.y=e.clientY;return true}
     const cam=state.sceneCamera,dx=e.clientX-ctx.md.x,dy=e.clientY-ctx.md.y;
     const control=ctx.md.t==='cameraControl'?ctx.md.mode:null;
     const type=control==='cameraMove'?'g':control==='cameraRotate'?'r':control==='cameraFocus'?'focus':ctx.md.type;
@@ -535,7 +536,9 @@ function pointerMove(ctx,e){
     persist(ctx.S);ctx.render();return true;
   }
   if(state.transform){
-    const t=state.transform,dx=e.clientX-t.x,dy=e.clientY-t.y,s=selectedStroke();
+    const t=state.transform;
+    if(!Number.isFinite(t.x)||!Number.isFinite(t.y)){t.x=e.clientX;t.y=e.clientY;return true}
+    const dx=e.clientX-t.x,dy=e.clientY-t.y,s=selectedStroke();
     if(s){transformStroke(s,t.type,dx,dy,t.axis);persist(ctx.S);ctx.render();return true}
   }
   if(ctx.md?.t==='gpPoint'&&state.selected?.s){
@@ -562,7 +565,9 @@ function pointerMove(ctx,e){
 function pointerUp(ctx){
   if(state.transform){state.transform=null;ctx.ui?.();persist(ctx.S);return true}
   if(ctx.md?.t==='gpDraw')ctx.ui?.();
-  if(ctx.md)ctx.md=null;return !!ctx.md;
+  const handled=!!ctx.md;
+  if(ctx.md)ctx.md=null;
+  return handled;
 }
 function wheel(ctx,e){
   if(e?.cancelable)e.preventDefault();
@@ -641,7 +646,8 @@ function keydown(ctx,e){
   if(k==='g'||k==='r'||k==='s'){
     if(state.sceneCamera.selected){
       const cam=state.sceneCamera;
-      ctx.md={t:'cameraTransform',type:k,x:e.clientX,y:e.clientY,position:[...cam.position],target:[...cam.target],lens:cam.lens,yaw:cameraViewTransform().yaw,pitch:cameraViewTransform().pitch,distance:cameraViewTransform().distance};
+      ctx.snap?.();
+      ctx.md={t:'cameraTransform',type:k,x:null,y:null,position:[...cam.position],target:[...cam.target],lens:cam.lens,yaw:cameraViewTransform().yaw,pitch:cameraViewTransform().pitch,distance:cameraViewTransform().distance};
       return true;
     }
     return beginTransform(ctx,k,null,e)
@@ -653,7 +659,7 @@ function keydown(ctx,e){
     return true;
   }
   if(e.shiftKey&&k==='d'){duplicateSelected(ctx);return true}
-  if(k==='escape'){state.transform=null;state.sceneCamera.selected=false;state.selected=null;state.selectedPoint=-1;ctx.ui?.();ctx.render();return true}
+  if(k==='escape'){state.transform=null;state.sceneCamera.selected=false;state.selected=null;state.selectedPoint=-1;persist(ctx.S);ctx.ui?.();ctx.render();return true}
   return false;
 }
 export const greasePencilMode={
