@@ -23,6 +23,7 @@ export function createHistory(getProject, setProject, limit = 100) {
       setProject(normalizeProject(future.pop()));
       return true;
     },
+    discardLatestSnapshot() { if (past.length) past.pop(); },
     clear() { past.length = 0; future.length = 0; }
   };
 }
