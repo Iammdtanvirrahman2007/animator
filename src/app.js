@@ -245,7 +245,8 @@ function greaseContext() {
   return {
     S: project, snap: takeSnapshot, render, ui: refreshUI, msg: status, col: colorInput, sz: widthInput, fl: fillInput,
     get tool() { return tool; }, set tool(value) { tool = value; },
-    get md() { return pointer; }, set md(value) { pointer = value; }
+    get md() { return pointer; }, set md(value) { pointer = value; },
+    cancelSnap() { history.discardLatestSnapshot(); }
   };
 }
 function inverseCameraPoint(point) {
