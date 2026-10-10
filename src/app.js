@@ -263,6 +263,9 @@ function beginCameraGesture(event) {
   pointer = { camera: true };
 }
 function pointerDown(event) {
+  if (event.pointerId != null && typeof canvas.setPointerCapture === 'function') {
+    try { canvas.setPointerCapture(event.pointerId); } catch (error) {}
+  }
   if (objectTransform && event.button === 0 && mode !== 'grease') {
     objectTransform = null; pointer = null; render(); status('Transform confirmed'); return;
   }
