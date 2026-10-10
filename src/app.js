@@ -590,12 +590,12 @@ function cancelTimelineDrag(event) {
 }
 function timelinePointerDown(event) {
   if (event.button !== 0) return;
+  timelineClickGuard = null;
   const cell = event.target.closest('.track-cell[data-track][data-frame]');
   if (!cell) return;
   const layerIndex = Number(cell.dataset.track), frame = Number(cell.dataset.frame);
   const layer = project.l[layerIndex];
   if (!layer || (!Object.prototype.hasOwnProperty.call(layer.d, String(frame)) && !Object.prototype.hasOwnProperty.call(layer.k, String(frame)))) return;
-  timelineClickGuard = null;
   clearTimelineDragFeedback();
   timelineDrag = { layerIndex, fromFrame: frame, toFrame: frame, pointerId: event.pointerId, startX: event.clientX, moved: false };
   try { $('timeline-content').setPointerCapture(event.pointerId); } catch (error) {}
