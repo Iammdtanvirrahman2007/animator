@@ -32,6 +32,8 @@ let playRequest = 0;
 let lastTick = 0;
 let lastAutosave = 0;
 let cameraGesture = null;
+let objectTransform = null;
+let lastCanvasPoint = [WIDTH / 2, HEIGHT / 2];
 let maskDraft = null;
 let statusTimer = 0;
 let gridVisible = false;
@@ -168,7 +170,7 @@ function setMode(next) {
   if (mode === 'grease') {
     try { greasePencilMode.enter({ S: project, render, ui: refreshUI }); } catch (error) { status('3D workspace initialisation failed: ' + error.message); }
   }
-  selectedStroke = null; selectedPoint = -1; pointer = null; preview = null; cameraGesture = null;
+  selectedStroke = null; selectedPoint = -1; pointer = null; preview = null; cameraGesture = null; objectTransform = null;
   $('mode-select').value = mode;
   renderTools(); render();
   status(mode === 'grease' ? 'Grease Pencil 3D: MMB orbit · Shift+MMB pan · wheel dolly' : mode[0].toUpperCase() + mode.slice(1) + ' mode');
@@ -258,6 +260,9 @@ function beginCameraGesture(event) {
   pointer = { camera: true };
 }
 function pointerDown(event) {
+  if (objectTransform && event.button === 0 && mode !== 'grease') {
+    objectTransform = null; pointer = null; render(); status('Transform confirmed'); return;
+  }
   if (event.button === 1 || (mode !== 'grease' && event.altKey)) {
     pointer = { pan: true, x: event.clientX, y: event.clientY };
     return;
@@ -268,6 +273,7 @@ function pointerDown(event) {
   if (event.button !== 0) return;
   const rawPoint = canvasCoordinates(event);
   const point = inverseCameraPoint(rawPoint);
+  lastCanvasPoint = point;
   const layer = activeLayer();
   if (!layer || !layer.v) return status('Select a visible layer before editing.');
   if (mode === 'camera') { beginCameraGesture(event); return; }
@@ -330,8 +336,24 @@ function pointerMove(event) {
     else project.camera.zoom = clampN(original.zoom * Math.exp(-dy * 0.008), 0.05, 8);
     render(); return;
   }
-  if (!pointer) return;
   const point = inverseCameraPoint(canvasCoordinates(event));
+  lastCanvasPoint = point;
+  if (objectTransform) {
+    const dx = point[0] - objectTransform.start[0], dy = point[1] - objectTransform.start[1];
+    const source = objectTransform.original, center = objectTransform.center;
+    if (objectTransform.type === 'g') objectTransform.stroke.p = source.map(p => [p[0] + dx, p[1] + dy]);
+    else if (objectTransform.type === 'r') {
+      const angle = Math.atan2(point[1] - center[1], point[0] - center[0]) - objectTransform.startAngle;
+      const cos = Math.cos(angle), sin = Math.sin(angle);
+      objectTransform.stroke.p = source.map(p => { const x = p[0] - center[0], y = p[1] - center[1]; return [center[0] + x * cos - y * sin, center[1] + x * sin + y * cos]; });
+    } else {
+      const distance = Math.max(1, Math.hypot(point[0] - center[0], point[1] - center[1]));
+      const factor = clampN(distance / objectTransform.startDistance, 0.02, 50);
+      objectTransform.stroke.p = source.map(p => [center[0] + (p[0] - center[0]) * factor, center[1] + (p[1] - center[1]) * factor]);
+    }
+    render(); return;
+  }
+  if (!pointer) return;
   if (pointer.type === 'move-stroke') {
     const dx = point[0] - pointer.last[0], dy = point[1] - pointer.last[1];
     for (const p of pointer.stroke.p) { p[0] += dx; p[1] += dy; }
@@ -389,6 +411,11 @@ function wheel(event) {
   }
 }
 function cancelOperation() {
+  if (objectTransform) {
+    objectTransform = null;
+    if (history.canUndo) history.undo();
+    selectedStroke = null; selectedPoint = -1; pointer = null; render(); status('Transform cancelled'); return;
+  }
   if (mode === 'grease') {
     try { if (greasePencilMode.keydown(greaseContext(), { key: 'Escape', ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, code: 'Escape' })) { pointer = null; render(); return; } } catch (error) {}
   }
@@ -572,10 +599,15 @@ function handleKeyDown(event) {
   if (event.shiftKey && key === 'm' && selectedStroke) {
     takeSnapshot(); selectedStroke.p = selectedStroke.p.map(point => [WIDTH - point[0], point[1]]); render(); return;
   }
-  if (key === 'g' && selectedStroke && mode !== 'grease' && mode !== 'camera') status('Drag a selected stroke to move it.');
-  if (key === 'r' && selectedStroke && mode !== 'grease' && mode !== 'camera') {
-    takeSnapshot(); const center = selectedStroke.p.reduce((sum, p) => [sum[0] + p[0] / selectedStroke.p.length, sum[1] + p[1] / selectedStroke.p.length], [0, 0]);
-    selectedStroke.p = selectedStroke.p.map(point => { const angle = -Math.PI / 12, x = point[0] - center[0], y = point[1] - center[1]; return [center[0] + x * Math.cos(angle) - y * Math.sin(angle), center[1] + x * Math.sin(angle) + y * Math.cos(angle)]; }); render();
+  if (['g', 'r', 's'].includes(key) && selectedStroke && mode !== 'grease' && mode !== 'camera') {
+    takeSnapshot();
+    const points = clone(selectedStroke.p);
+    const center = points.reduce((sum, point) => [sum[0] + point[0] / points.length, sum[1] + point[1] / points.length], [0, 0]);
+    objectTransform = { type: key, stroke: selectedStroke, original: points, start: [...lastCanvasPoint], center,
+      startAngle: Math.atan2(lastCanvasPoint[1] - center[1], lastCanvasPoint[0] - center[0]),
+      startDistance: Math.max(1, Math.hypot(lastCanvasPoint[0] - center[0], lastCanvasPoint[1] - center[1])) };
+    status(({ g: 'Move', r: 'Rotate', s: 'Scale' })[key] + ' stroke · move cursor, click to confirm, Esc to cancel');
+    return;
   }
   if (key === 'p' && mode !== 'grease') { gridVisible = !gridVisible; render(); }
 }
