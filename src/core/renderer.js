@@ -99,6 +99,30 @@ function drawSelection(ctx, stroke, layer, frame, editMode) {
   ctx.restore();
 }
 
+function applyMaskClip(ctx, masks, frame) {
+  const data = masks?.[frame]?.filter(mask => mask?.p?.length >= 3 &&
+    (mask.closed || mask.shape === 'rect' || mask.shape === 'ellipse'));
+  if (!data?.length) return false;
+  ctx.beginPath();
+  ctx.rect(0, 0, WIDTH, HEIGHT);
+  for (const mask of data) {
+    const points = mask.p;
+    if (mask.shape === 'rect' && points.length >= 2) {
+      ctx.rect(points[0][0], points[0][1], points[1][0] - points[0][0], points[1][1] - points[0][1]);
+    } else if (mask.shape === 'ellipse' && points.length >= 2) {
+      const x = Math.min(points[0][0], points[1][0]), y = Math.min(points[0][1], points[1][1]);
+      ctx.ellipse(x + Math.abs(points[1][0] - points[0][0]) / 2, y + Math.abs(points[1][1] - points[0][1]) / 2,
+        Math.max(0.5, Math.abs(points[1][0] - points[0][0]) / 2), Math.max(0.5, Math.abs(points[1][1] - points[0][1]) / 2), 0, 0, Math.PI * 2);
+    } else {
+      ctx.moveTo(points[0][0], points[0][1]);
+      for (let index = 1; index < points.length; index++) ctx.lineTo(points[index][0], points[index][1]);
+      ctx.closePath();
+    }
+  }
+  try { ctx.clip('evenodd'); } catch (error) { ctx.clip(); }
+  return true;
+}
+
 function drawMasks(ctx, masks, frame) {
   const data = masks?.[frame];
   if (!Array.isArray(data)) return;
@@ -123,6 +147,7 @@ export function renderFrame(ctx, project, frame, options = {}) {
   ctx.fillStyle = project.bg || '#fbfaf7';
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
   if (options.grid) drawGrid(ctx);
+  if (options.mode !== 'mask') applyMaskClip(ctx, project.masks, frame);
 
   if (options.mode === 'grease' && options.greaseMode) {
     options.greaseMode.draw(ctx, project, frame, options.onion !== false);
@@ -177,6 +202,15 @@ export function hitStroke(strokes, x, y, tolerance = 12) {
   for (let index = strokes.length - 1; index >= 0; index--) {
     const stroke = strokes[index], points = stroke.p || [];
     if (!points.length) continue;
+    if (stroke.closed && points.length >= 3) {
+      let inside = false;
+      for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        const xi = points[i][0], yi = points[i][1], xj = points[j][0], yj = points[j][1];
+        const crosses = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-9) + xi);
+        if (crosses) inside = !inside;
+      }
+      if (inside) return stroke;
+    }
     if ((stroke.shape === 'rect' || stroke.shape === 'ellipse') && points.length >= 2) {
       const minX = Math.min(points[0][0], points[1][0]), maxX = Math.max(points[0][0], points[1][0]);
       const minY = Math.min(points[0][1], points[1][1]), maxY = Math.max(points[0][1], points[1][1]);
