@@ -32,6 +32,19 @@ jobs:
             node --check "$file"
           done
 
+      - name: Check inline application script syntax
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const html = fs.readFileSync('index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+            .filter(([, attrs, source]) => !/\bsrc\s*=/.test(attrs) && source.trim());
+          if (!scripts.length) throw new Error('No inline application script found in index.html');
+          for (const [, , source] of scripts) new Function(source);
+          console.log(`Syntax-checked ${scripts.length} inline application script(s).`);
+          NODE
+
       - name: Check index.html exists
         run: test -f index.html
 
