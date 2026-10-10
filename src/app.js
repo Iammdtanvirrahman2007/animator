@@ -221,8 +221,7 @@ function deleteExposure() {
 }
 function fitCanvas() {
   const parent = $('stage-wrap');
-  const bounds = parent.getBoundingClientRect();
-  const ratio = Math.min(bounds.width / WIDTH, bounds.height / HEIGHT);
+  const ratio = Math.min(parent.clientWidth / WIDTH, parent.clientHeight / HEIGHT);
   canvas.style.width = Math.max(1, Math.floor(WIDTH * ratio)) + 'px';
   canvas.style.height = Math.max(1, Math.floor(HEIGHT * ratio)) + 'px';
 }
@@ -280,7 +279,7 @@ function pointerDown(event) {
     render(); return;
   }
   const strokes = layer.d[project.f] || [];
-  if (tool === 'select' || mode === 'object' || mode === 'animate' || mode === 'edit' || tool === 'fill') {
+  if (tool === 'select' || mode === 'edit' || tool === 'fill') {
     const hit = hitStroke(strokes, point[0], point[1]);
     if (tool === 'fill' && hit) {
       takeSnapshot(); hit.fill = true; hit.fillColor = fillColorInput.value || colorInput.value; hit.closed = true;
@@ -342,13 +341,13 @@ function pointerMove(event) {
     pointer.stroke.p[pointer.index] = point; render(); return;
   }
   if (pointer.type === 'draw') {
-    const shape = createShape(pointer.tool, pointer.start, point);
-    pointer.stroke.p = shape.p;
-    if (pointer.tool === 'pencil' || pointer.tool === 'erase') {
+    if (pointer.tool === 'pencil') {
       const last = pointer.stroke.p[pointer.stroke.p.length - 1];
       if (Math.hypot(point[0] - last[0], point[1] - last[1]) > 1.2) pointer.stroke.p.push(point);
+    } else {
+      const shape = createShape(pointer.tool, pointer.start, point);
+      pointer.stroke.p = shape.p;
     }
-    if (pointer.tool === 'line' || pointer.tool === 'rect' || pointer.tool === 'ellipse') pointer.stroke.p = shape.p;
     render(); return;
   }
   if (pointer.type === 'mask') {
@@ -491,6 +490,7 @@ function attachEvents() {
   $('save-btn').addEventListener('click', saveJSON);
   $('open-btn').addEventListener('click', () => $('file-input').click());
   $('file-input').addEventListener('change', event => { if (event.target.files?.[0]) openJSON(event.target.files[0]); });
+  $('help-btn').addEventListener('click', () => $('help-dialog').showModal());
   $('undo-btn').addEventListener('click', undo);
   $('redo-btn').addEventListener('click', redo);
   $('export-png-btn').addEventListener('click', () => runExport('png'));
