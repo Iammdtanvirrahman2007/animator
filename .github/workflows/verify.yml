@@ -39,6 +39,16 @@ jobs:
           grep -F '<script type="module" src="./src/main.js"></script>' index.html
           grep -F '<link rel="stylesheet" href="./styles.css">' index.html
           grep -F "import './app.js';" src/main.js
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const html = fs.readFileSync('index.html', 'utf8');
+          const app = fs.readFileSync('src/app.js', 'utf8');
+          const ids = new Set([...html.matchAll(/\bid=["']([^"']+)["']/g)].map(match => match[1]));
+          const refs = [...new Set([...app.matchAll(/\$\('([^']+)'\)/g)].map(match => match[1]))];
+          const missing = refs.filter(id => !ids.has(id));
+          if (missing.length) throw new Error('App references missing HTML IDs: ' + missing.join(', '));
+          console.log('Verified ' + refs.length + ' app DOM references against index.html.');
+          NODE
 
       - name: Run core regression tests
         run: node --experimental-default-type=module --test tests/*.test.js
