@@ -37,7 +37,7 @@ export const cameraMode={
     camera.x=md.cx-dx/camera.zoom;
     camera.y=md.cy-dy/camera.zoom;
    }else if(md.t==='cameraR')camera.r=md.r+dx*.5;
-   else camera.zoom=cl(md.zoom*Math.exp(-dy*.01),.05,8);
+   else camera.zoom=Math.max(.05,Math.min(8,md.zoom*Math.exp(-dy*.01)));
    ctx.render();
    return true;
   }
