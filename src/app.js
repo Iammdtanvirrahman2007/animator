@@ -37,6 +37,7 @@ let lastCanvasPoint = [WIDTH / 2, HEIGHT / 2];
 let maskDraft = null;
 let statusTimer = 0;
 let gridVisible = false;
+let canvasZoom = 1;
 let dirty = false;
 let opacitySnapshotTaken = false;
 let backgroundSnapshotTaken = false;
@@ -114,6 +115,7 @@ function renderProperties() {
   $('tool-title').textContent = (TOOLSETS[mode] || [])[0] ? mode[0].toUpperCase() + mode.slice(1) + ' workspace' : 'Workspace';
   $('play-btn').textContent = playing ? 'Ⅱ' : '▶';
   $('play-btn').title = playing ? 'Pause playback (Space)' : 'Play animation (Space)';
+  $('zoom-indicator').textContent = Math.round(canvasZoom * 100) + '%';
   $('grid-btn').classList.toggle('active', gridVisible);
   $('onion-btn').classList.toggle('active', project.on > 0);
 }
@@ -225,7 +227,7 @@ function deleteExposure() {
 }
 function fitCanvas() {
   const parent = $('stage-wrap');
-  const ratio = Math.min(parent.clientWidth / WIDTH, parent.clientHeight / HEIGHT);
+  const ratio = Math.min(parent.clientWidth / WIDTH, parent.clientHeight / HEIGHT) * canvasZoom;
   canvas.style.width = Math.max(1, Math.floor(WIDTH * ratio)) + 'px';
   canvas.style.height = Math.max(1, Math.floor(HEIGHT * ratio)) + 'px';
 }
@@ -434,6 +436,9 @@ function wheel(event) {
   if (event.ctrlKey || event.metaKey) {
     event.preventDefault(); widthInput.value = clampN(Number(widthInput.value) + (event.deltaY < 0 ? 1 : -1), 1, 100); $('brush-size-value').textContent = widthInput.value; return;
   }
+  event.preventDefault();
+  canvasZoom = clampN(canvasZoom * (event.deltaY < 0 ? 1.1 : 1 / 1.1), 0.25, 4);
+  fitCanvas(); renderProperties();
 }
 function cancelOperation() {
   if (objectTransform) {
