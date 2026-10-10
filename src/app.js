@@ -38,6 +38,8 @@ let maskDraft = null;
 let statusTimer = 0;
 let gridVisible = false;
 let dirty = false;
+let opacitySnapshotTaken = false;
+let backgroundSnapshotTaken = false;
 
 function loadProject() {
   try {
@@ -548,11 +550,18 @@ function attachEvents() {
   $('layer-down-btn').addEventListener('click', () => moveLayer(1));
   $('layer-name').addEventListener('change', event => { takeSnapshot(); activeLayer().n = event.target.value.trim() || 'Layer'; refreshUI(); });
   $('layer-visible').addEventListener('change', event => { takeSnapshot(); activeLayer().v = event.target.checked ? 1 : 0; render(); });
+  const snapshotOpacityChange = () => { if (!opacitySnapshotTaken) { takeSnapshot(); opacitySnapshotTaken = true; } };
+  $('layer-opacity').addEventListener('pointerdown', snapshotOpacityChange);
+  $('layer-opacity').addEventListener('keydown', snapshotOpacityChange);
   $('layer-opacity').addEventListener('input', event => { activeLayer().opacity = Number(event.target.value) / 100; $('layer-opacity-value').textContent = event.target.value + '%'; render(); });
-  $('layer-opacity').addEventListener('change', takeSnapshot);
+  $('layer-opacity').addEventListener('change', () => { opacitySnapshotTaken = false; });
   $('blend-mode').addEventListener('change', event => { takeSnapshot(); activeLayer().bm = event.target.value; render(); });
   $('interpolation').addEventListener('change', event => { takeSnapshot(); activeLayer().e = event.target.value; render(); });
+  const snapshotBackgroundChange = () => { if (!backgroundSnapshotTaken) { takeSnapshot(); backgroundSnapshotTaken = true; } };
+  $('background-color').addEventListener('pointerdown', snapshotBackgroundChange);
+  $('background-color').addEventListener('keydown', snapshotBackgroundChange);
   $('background-color').addEventListener('input', event => { project.bg = event.target.value; render(); });
+  $('background-color').addEventListener('change', () => { backgroundSnapshotTaken = false; });
   $('frame-current').addEventListener('change', event => setFrame(Number(event.target.value)));
   $('frame-start').addEventListener('change', event => { takeSnapshot(); project.a = clampN(Math.round(Number(event.target.value) || 1), 1, project.b); project.f = clampN(project.f, project.a, project.b); refreshUI(); });
   $('frame-end').addEventListener('change', event => { takeSnapshot(); project.b = clampN(Math.round(Number(event.target.value) || 48), project.a, 999999); project.f = clampN(project.f, project.a, project.b); refreshUI(); });
