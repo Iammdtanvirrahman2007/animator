@@ -65,7 +65,7 @@ export function normalizeProject(input) {
 export function exposedFrame(layer, frame) {
   const frames = sortedFrames(layer.d);
   const previous = frames.filter(value => value <= frame).pop();
-  return previous ?? frames.find(value => value > frame) ?? null;
+  return previous ?? null;
 }
 
 export function drawingAt(layer, frame) {
