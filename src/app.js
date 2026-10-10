@@ -179,7 +179,7 @@ function setMode(next) {
     try { greasePencilMode.exit({ S: project, render, ui: refreshUI, get md() { return pointer; }, set md(value) { pointer = value; } }); } catch (error) {}
   }
   mode = next;
-  tool = next === 'draw' ? 'pencil' : next === 'camera' ? 'select' : next === 'grease' ? 'select' : next === 'edit' ? 'point' : 'select';
+  tool = next === 'draw' || next === 'mask' ? 'pencil' : next === 'camera' ? 'select' : next === 'grease' ? 'select' : next === 'edit' ? 'point' : 'select';
   if (mode === 'grease') {
     try { greasePencilMode.enter({ S: project, render, ui: refreshUI }); } catch (error) { status('3D workspace initialisation failed: ' + error.message); }
   }
@@ -472,21 +472,25 @@ function wheel(event) {
 }
 function cancelOperation() {
   if (objectTransform) {
+    objectTransform.stroke.p = clone(objectTransform.original);
     objectTransform = null;
-    if (history.canUndo) history.undo();
+    history.discardLatestSnapshot();
     selectedStroke = null; selectedPoint = -1; pointer = null; render(); status('Transform cancelled'); return;
   }
   if (mode === 'grease') {
     try { if (greasePencilMode.keydown(greaseContext(), { key: 'Escape', ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, code: 'Escape' })) { pointer = null; render(); return; } } catch (error) {}
   }
   if (cameraGesture) {
-    project.camera = { ...cameraGesture.original };
+    const gesture = cameraGesture;
+    project.camera = { ...gesture.original };
     cameraGesture = null; pointer = null;
-    if (history.canUndo) history.undo();
+    if (gesture.snapshotted) history.discardLatestSnapshot();
     render(); status('Camera transform cancelled'); return;
   }
   if (pointer || preview) {
-    if (history.canUndo) history.undo();
+    const operation = pointer;
+    const hasOperationSnapshot = !!(operation && (['draw', 'mask'].includes(operation.type) || operation.snapshotted));
+    if (hasOperationSnapshot) history.undo();
     pointer = null; preview = null; maskDraft = null; selectedStroke = null; render(); status('Operation cancelled');
   }
 }
