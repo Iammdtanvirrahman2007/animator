@@ -102,14 +102,17 @@ function drawSelection(ctx, stroke, layer, frame, editMode) {
 function drawMasks(ctx, masks, frame) {
   const data = masks?.[frame];
   if (!Array.isArray(data)) return;
-  ctx.save(); ctx.strokeStyle = '#e45858'; ctx.fillStyle = '#e4585820';
-  for (const path of data) {
-    if (!path.p?.length) continue;
-    ctx.beginPath(); ctx.moveTo(path.p[0][0], path.p[0][1]);
-    for (let i = 1; i < path.p.length; i++) ctx.lineTo(path.p[i][0], path.p[i][1]);
-    if (path.closed) { ctx.closePath(); ctx.fill(); }
-    ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.save();
+  ctx.setLineDash([5, 4]);
+  for (const mask of data) {
+    if (!mask.p?.length) continue;
+    traceStroke(ctx, {
+      ...mask, c: '#e45858', w: 2,
+      fill: !!(mask.closed || mask.shape === 'rect' || mask.shape === 'ellipse'),
+      fillColor: '#e4585820'
+    });
   }
+  ctx.setLineDash([]);
   ctx.restore();
 }
 
@@ -142,14 +145,13 @@ export function renderFrame(ctx, project, frame, options = {}) {
   }
 
   if (options.mode === 'animate' && options.onion !== false && Number(project.on) > 0) {
+    const count = clamp(Number(project.on) || 0, 0, 5);
     for (const layer of project.l) {
       const frames = sortedFrames(layer.d);
-      const current = frames.filter(f => f <= frame).pop();
-      const previous = frames.filter(f => f < (current ?? frame)).pop();
-      const next = frames.find(f => f > (current ?? frame));
-      const count = Math.max(0, Math.min(5, Number(project.on) || 0));
-      if (previous != null && count > 0) paintLayer(ctx, layer, previous, 0.25, '#df6161');
-      if (next != null && count > 0) paintLayer(ctx, layer, next, 0.25, '#42a77c');
+      const previous = frames.filter(value => value < frame).reverse().slice(0, count);
+      const next = frames.filter(value => value > frame).slice(0, count);
+      previous.forEach((value, index) => paintLayer(ctx, layer, value, 0.32 / (index + 1), '#df6161'));
+      next.forEach((value, index) => paintLayer(ctx, layer, value, 0.32 / (index + 1), '#42a77c'));
     }
   }
 
