@@ -100,8 +100,8 @@ function drawSelection(ctx, stroke, layer, frame, editMode) {
 }
 
 function applyMaskClip(ctx, masks, frame) {
-  const data = masks?.[frame]?.filter(mask => mask?.p?.length >= 3 &&
-    (mask.closed || mask.shape === 'rect' || mask.shape === 'ellipse'));
+  const data = masks?.[frame]?.filter(mask => mask && Array.isArray(mask.p) &&
+    ((['rect', 'ellipse'].includes(mask.shape) && mask.p.length >= 2) || (mask.closed && mask.p.length >= 3)));
   if (!data?.length) return false;
   ctx.beginPath();
   ctx.rect(0, 0, WIDTH, HEIGHT);
