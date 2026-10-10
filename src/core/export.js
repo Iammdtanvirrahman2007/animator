@@ -20,12 +20,12 @@ export function exportPNG(canvas, filename) {
 
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
-export async function exportWebM({ canvas, fps, start, end, render, progress }) {
+export async function exportWebM({ canvas, fps, start, end, render, progress, downloadResult = true }) {
   if (!window.MediaRecorder || !canvas.captureStream) throw new Error('WebM recording is not supported in this browser.');
   const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
   const mimeType = candidates.find(type => MediaRecorder.isTypeSupported(type));
   if (!mimeType) throw new Error('This browser has no supported WebM encoder.');
-  const stream = canvas.captureStream(0);
+  const stream = canvas.captureStream(Math.max(1, fps));
   const track = stream.getVideoTracks()[0];
   const chunks = [];
   const recorder = new MediaRecorder(stream, { mimeType });
@@ -50,12 +50,12 @@ export async function exportWebM({ canvas, fps, start, end, render, progress }) 
   await stopped;
   const blob = new Blob(chunks, { type: 'video/webm' });
   if (!blob.size) throw new Error('The recorder produced an empty video.');
-  download(blob, 'animation.webm');
+  if (downloadResult) download(blob, 'animation.webm');
   return blob;
 }
 
 export async function exportMP4(options) {
-  const webm = await exportWebM(options);
+  const webm = await exportWebM({ ...options, downloadResult: false });
   if (options.progress) options.progress(options.end - options.start + 1, options.end - options.start + 1, 'Encoding MP4…');
   const [{ FFmpeg }, { fetchFile, toBlobURL }] = await Promise.all([
     import('https://esm.sh/@ffmpeg/ffmpeg@0.12.10'),
