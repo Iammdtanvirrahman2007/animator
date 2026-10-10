@@ -297,7 +297,7 @@ vp.onpointerdown=e=>{vp.setPointerCapture(e.pointerId);
 vp.onpointermove=e=>{const p=pt(e);ms=p;
  if(mode==='grease'&&window.GreasePencil3D?.pointerMove){const handled=window.GreasePencil3D.pointerMove({S,snap,render:R,ui,col,sz,fl,msg,get tool(){return tool},set tool(v){tool=v},get md(){return md},set md(v){md=v}},e);if(handled)return}
  if(mode==='camera'&&window.KeyframeModes?.camera?.pointerMove){
-  const handled=window.KeyframeModes.camera.pointerMove({camera:S.camera,screen:e=>[e.clientX,e.clientY],get md(){return md},set md(v){md=v},render:R,ui},e);
+  const handled=window.KeyframeModes.camera.pointerMove({camera:S.camera,screen:e=>pt(e),get md(){return md},set md(v){md=v},render:R,ui,snap},e);
   if(handled)return;
  }
  if(mo){mv(p);return}if(!md&&(mode==='edit'||tool==='select')){vp.classList.remove('cursor-object','cursor-point');const L=S.l[S.i];if(L){const q=loc(L,S.f,p[0],p[1]),hit=hitStroke(dr(L,S.f),q[0],q[1]);if(mode==='edit'&&selectedObject&&selectedObject.L===L&&selectedObject.f===S.f&&nearestPoint(selectedObject.s,q[0],q[1])>=0)vp.classList.add('cursor-point');else if(hit)vp.classList.add('cursor-object')}return}if(!md){if(pendingShape){const b=pendingBox(),q=loc(pendingShape.L,pendingShape.f,p[0],p[1]),h=b&&pendingHandle(b,q[0],q[1]);vp.classList.remove('cursor-grab','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');const cls=h=='rotate'?'cursor-rotate':h=='e'||h=='w'?'cursor-ew':h=='n'||h=='s'?'cursor-ns':h=='nw'||h=='se'?'cursor-scale':h?'cursor-nesw':'cursor-grab';vp.classList.add(cls)}return}
