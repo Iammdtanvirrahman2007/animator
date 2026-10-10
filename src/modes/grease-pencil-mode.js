@@ -446,7 +446,7 @@ function pointerDown(ctx,e){
   if(['cameraMove','cameraRotate','cameraFocus'].includes(ctx.tool)){
     const cam=state.sceneCamera;
     state.sceneCamera.selected=true;
-    ctx.md={t:'cameraControl',mode:ctx.tool,x:e.clientX,y:e.clientY,position:[...cam.position],target:[...cam.target],lens:cam.lens,yaw:cameraViewTransform().yaw,pitch:cameraViewTransform().pitch,distance:cameraViewTransform().distance};
+    ctx.md={t:'cameraControl',mode:ctx.tool,x:e.clientX,y:e.clientY,position:[...cam.position],target:[...cam.target],lens:cam.lens,yaw:cameraViewTransform().yaw,pitch:cameraViewTransform().pitch,distance:cameraViewTransform().distance,historyAdded:false};
     ctx.ui?.();return true;
   }
   const S=ctx.S,[sx,sy]=screen(e);
@@ -462,7 +462,7 @@ function pointerDown(ctx,e){
     persist(S);ctx.ui?.();ctx.render();return true;
   }
   if(ctx.tool==='camera'&&!state.edit){
-    placeCameraAtViewport(S,sx,sy);
+    ctx.snap?.();placeCameraAtViewport(S,sx,sy);
     ctx.ui?.();ctx.render();return true;
   }
   if((ctx.tool==='select'||ctx.tool==='edit')&&state.edit){
@@ -515,6 +515,7 @@ function pointerMove(ctx,e){
   if(state.sceneCamera.selected&&(ctx.md?.t==='cameraTransform'||ctx.md?.t==='cameraControl')){
     if(!Number.isFinite(ctx.md.x)||!Number.isFinite(ctx.md.y)){ctx.md.x=e.clientX;ctx.md.y=e.clientY;return true}
     const cam=state.sceneCamera,dx=e.clientX-ctx.md.x,dy=e.clientY-ctx.md.y;
+    if((dx||dy)&&!ctx.md.historyAdded){ctx.snap?.();ctx.md.historyAdded=true}
     const control=ctx.md.t==='cameraControl'?ctx.md.mode:null;
     const type=control==='cameraMove'?'g':control==='cameraRotate'?'r':control==='cameraFocus'?'focus':ctx.md.type;
     if(type==='focus'){
@@ -617,8 +618,13 @@ function keydown(ctx,e){
     if(k==='escape'){
       const old=JSON.parse(state.transform.original),s=selectedStroke();
       if(s){for(const key of Object.keys(s))delete s[key];Object.assign(s,old)}
-      state.transform=null;ctx.ui?.();ctx.render();return true
+      state.transform=null;ctx.cancelSnap?.();ctx.ui?.();ctx.render();return true
     }
+  }
+  if(k==='escape'&&ctx.md&&['cameraTransform','cameraControl'].includes(ctx.md.t)){
+    const md=ctx.md,cam=state.sceneCamera;
+    cam.position=[...md.position];cam.target=[...md.target];cam.lens=md.lens;
+    ctx.md=null;if(md.historyAdded)ctx.cancelSnap?.();persist(ctx.S);ctx.ui?.();ctx.render();return true;
   }
   if(k==='1'&&e.code==='Numpad1'){state.yaw=0;state.pitch=0;persist(ctx.S);ctx.render();return true}
   if(k==='3'&&e.code==='Numpad3'){state.yaw=Math.PI/2;state.pitch=0;persist(ctx.S);ctx.render();return true}
