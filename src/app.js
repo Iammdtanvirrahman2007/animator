@@ -282,7 +282,7 @@ function pointerDown(event) {
     if (tool === 'erase') {
       const hit = hitStroke(masks, point[0], point[1], 16);
       if (hit) { takeSnapshot(); project.masks[project.f] = masks.filter(mask => mask !== hit); render(); }
-      pointer = { type: 'mask-erase' }; return;
+      pointer = { type: 'mask-erase', snapshotted: !!hit }; return;
     }
     takeSnapshot();
     const shape = createShape(tool === 'ellipse' ? 'ellipse' : tool === 'rect' ? 'rect' : 'path', point, point);
@@ -391,7 +391,10 @@ function pointerMove(event) {
   }
   if (pointer.type === 'mask-erase') {
     const masks = project.masks[project.f] || [], hit = hitStroke(masks, point[0], point[1], 16);
-    if (hit) { project.masks[project.f] = masks.filter(mask => mask !== hit); render(); }
+    if (hit) {
+      if (!pointer.snapshotted) { takeSnapshot(); pointer.snapshotted = true; }
+      project.masks[project.f] = masks.filter(mask => mask !== hit); render();
+    }
     return;
   }
   if (pointer.type === 'erase') {
