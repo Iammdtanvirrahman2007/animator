@@ -305,6 +305,7 @@ function pointerDown(event) {
       takeSnapshot(); hit.fill = true; hit.fillColor = fillColorInput.value || colorInput.value; hit.closed = true;
       selectedStroke = hit; render(); status('Shape filled'); return;
     }
+    if (tool === 'fill' && !hit) { status('Click a closed shape to fill it.'); render(); return; }
     if (hit) {
       selectedStroke = hit; selectedLayer = project.i; selectedPoint = -1;
       if (mode === 'edit' || tool === 'point') {
