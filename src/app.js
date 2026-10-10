@@ -1,4 +1,4 @@
-import { freshProject, normalizeProject, clone, clamp, WIDTH, HEIGHT, drawingAt, sortedFrames, transformAt, captureTransform, keyframeAt, exposedFrame } from './core/model.js';
+import { freshProject, normalizeProject, clone, clamp, WIDTH, HEIGHT, drawingAt, sortedFrames, transformAt, captureTransform, keyframeAt, exposedFrame, moveFrameKeys } from './core/model.js';
 import { createHistory } from './core/history.js';
 import { renderFrame, pointFromEvent, hitStroke, nearestPoint } from './core/renderer.js';
 import { exportPNG, exportWebM, exportMP4 } from './core/export.js';
@@ -28,6 +28,8 @@ let selectedPoint = -1;
 let pointer = null;
 let preview = null;
 let playing = false;
+let timelineDrag = null;
+let timelineDidMove = false;
 let playRequest = 0;
 let lastTick = 0;
 let lastAutosave = 0;
@@ -557,10 +559,60 @@ async function runExport(kind) {
   finally { project.f = before; render(); }
 }
 function insertTimelineKey(event) {
+  if (timelineDidMove) { timelineDidMove = false; event.preventDefault(); return; }
   const target = event.target.closest('[data-frame]');
   if (!target) return;
   if (target.dataset.track != null) selectLayer(Number(target.dataset.track));
   setFrame(Number(target.dataset.frame));
+}
+function timelinePointerDown(event) {
+  if (event.button !== 0) return;
+  const cell = event.target.closest('.track-cell[data-track][data-frame]');
+  if (!cell) return;
+  const layerIndex = Number(cell.dataset.track), frame = Number(cell.dataset.frame);
+  const layer = project.l[layerIndex];
+  if (!layer || (!Object.prototype.hasOwnProperty.call(layer.d, String(frame)) && !Object.prototype.hasOwnProperty.call(layer.k, String(frame)))) return;
+  timelineDrag = { layerIndex, fromFrame: frame, toFrame: frame, pointerId: event.pointerId, startX: event.clientX, moved: false };
+  timelineDidMove = false;
+  try { $('timeline-content').setPointerCapture(event.pointerId); } catch (error) {}
+}
+function timelinePointerMove(event) {
+  if (!timelineDrag || timelineDrag.pointerId !== event.pointerId) return;
+  const cell = document.elementFromPoint(event.clientX, event.clientY)?.closest('.track-cell[data-track][data-frame]');
+  document.querySelectorAll('.timeline-drag-target').forEach(node => node.classList.remove('timeline-drag-target'));
+  if (!cell || Number(cell.dataset.track) !== timelineDrag.layerIndex) return;
+  timelineDrag.toFrame = Number(cell.dataset.frame);
+  if (timelineDrag.toFrame !== timelineDrag.fromFrame && Math.abs(event.clientX - timelineDrag.startX) > 3) {
+    timelineDrag.moved = true;
+    timelineDidMove = true;
+    cell.classList.add('timeline-drag-target');
+  }
+}
+function timelinePointerUp(event) {
+  if (!timelineDrag || timelineDrag.pointerId !== event.pointerId) return;
+  const drag = timelineDrag;
+  const cell = document.elementFromPoint(event.clientX, event.clientY)?.closest('.track-cell[data-track][data-frame]');
+  document.querySelectorAll('.timeline-drag-target').forEach(node => node.classList.remove('timeline-drag-target'));
+  timelineDrag = null;
+  if (!drag.moved || !cell || Number(cell.dataset.track) !== drag.layerIndex) return;
+  const toFrame = Number(cell.dataset.frame), layer = project.l[drag.layerIndex];
+  if (!layer || toFrame === drag.fromFrame) return;
+  const movingDrawing = Object.prototype.hasOwnProperty.call(layer.d, String(drag.fromFrame));
+  const movingTransform = Object.prototype.hasOwnProperty.call(layer.k, String(drag.fromFrame));
+  if ((movingDrawing && Object.prototype.hasOwnProperty.call(layer.d, String(toFrame))) ||
+      (movingTransform && Object.prototype.hasOwnProperty.call(layer.k, String(toFrame)))) {
+    status('That frame already contains a matching key. Choose an empty frame.');
+    return;
+  }
+  takeSnapshot();
+  const moved = moveFrameKeys(layer, drag.fromFrame, toFrame);
+  if (!moved) { history.discardLatestSnapshot(); return; }
+  project.i = drag.layerIndex;
+  selectedLayer = drag.layerIndex;
+  project.f = clampN(toFrame, project.a, project.b);
+  selectedStroke = null; selectedPoint = -1;
+  markDirty(); refreshUI();
+  status('Timeline key moved to frame ' + toFrame);
 }
 function attachEvents() {
   $('mode-select').addEventListener('change', event => setMode(event.target.value));
@@ -576,6 +628,10 @@ function attachEvents() {
     const row = event.target.closest('[data-layer]');
     if (row) selectLayer(Number(row.dataset.layer));
   });
+  $('timeline-content').addEventListener('pointerdown', timelinePointerDown);
+  $('timeline-content').addEventListener('pointermove', timelinePointerMove);
+  $('timeline-content').addEventListener('pointerup', timelinePointerUp);
+  $('timeline-content').addEventListener('pointercancel', () => { timelineDrag = null; });
   $('timeline-content').addEventListener('click', insertTimelineKey);
   $('new-btn').addEventListener('click', newProject);
   $('save-btn').addEventListener('click', saveJSON);
