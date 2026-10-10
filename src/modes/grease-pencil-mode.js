@@ -475,6 +475,7 @@ function pointerDown(ctx,e){
   if(ctx.tool==='cameraPath'){
     const existing=state.cameraPath.map(project).map((p,i)=>p?{i,d:Math.hypot(p[0]-sx,p[1]-sy)}:null).filter(Boolean).sort((a,b)=>a.d-b.d)[0];
     if(existing&&existing.d<14&&!e.shiftKey){state.cameraPathSelected=existing.i;ctx.ui?.();ctx.render();return true}
+    ctx.snap?.();
     const w=planePoint(sx,sy,'XY',0);
     if(e.shiftKey){state.cameraPath=[];state.cameraPathFrames=[];state.cameraPathEase=[]}
     state.cameraPath.push(w);
@@ -647,7 +648,7 @@ function keydown(ctx,e){
     const i=state.cameraPathSelected,dir=k==='arrowright'?1:-1,step=e.altKey?10:1,prev=i>0?state.cameraPathFrames[i-1]:state.a,next=i<state.cameraPathFrames.length-1?state.cameraPathFrames[i+1]:state.b;
     state.cameraPathFrames[i]=cl(state.cameraPathFrames[i]+dir*step,prev+1,next-1);persist(ctx.S);ctx.ui?.();ctx.render();return true;
   }
-  if(k==='p'&&!e.ctrlKey&&!e.metaKey){state.pageVisible=!state.pageVisible;ctx.ui?.();ctx.render();return true}
+  if(k==='p'&&!e.ctrlKey&&!e.metaKey){state.pageVisible=!state.pageVisible;persist(ctx.S);ctx.ui?.();ctx.render();return true}
   if(k==='home'){frameScene(ctx.S);ctx.ui?.();ctx.render();return true}
   if(k==='g'||k==='r'||k==='s'){
     if(state.sceneCamera.selected){
