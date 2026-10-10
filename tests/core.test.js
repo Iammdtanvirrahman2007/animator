@@ -5,7 +5,7 @@ import {
   captureTransform, keyframeAt, allFrames, drawingFrames
 } from '../src/core/model.js';
 import { createHistory } from '../src/core/history.js';
-import { hitStroke, nearestPoint } from '../src/core/renderer.js';
+import { hitStroke, nearestPoint, renderFrame } from '../src/core/renderer.js';
 
 test('new project creates a valid starter layer and frame range', () => {
   const project = freshProject();
@@ -69,6 +69,38 @@ test('stroke hit test and edit-point picking work near geometry', () => {
   assert.equal(hitStroke([stroke], 400, 400), null);
   assert.equal(nearestPoint(stroke, 29, 11), 1);
   assert.equal(nearestPoint(stroke, 90, 90), -1);
+});
+
+
+function mockCanvasContext() {
+  const calls = [];
+  const methods = ['save','restore','fillRect','beginPath','moveTo','lineTo','rect','ellipse','closePath','fill','stroke','translate','rotate','scale','setLineDash','arc','strokeRect','fillText','clip'];
+  const context = { calls, globalAlpha: 1, globalCompositeOperation: 'source-over' };
+  for (const method of methods) context[method] = (...args) => calls.push([method, ...args]);
+  return context;
+}
+
+test('renderer paints strokes and clips masked regions outside mask mode', () => {
+  const project = freshProject();
+  project.l[0].d[1] = [{ c: '#222222', w: 3, p: [[10, 10], [40, 40]], shape: 'path' }];
+  project.masks[1] = [{ shape: 'rect', p: [[5, 5], [50, 50]], closed: true }];
+  const normalContext = mockCanvasContext();
+  renderFrame(normalContext, project, 1, { mode: 'draw', onion: false });
+  assert.ok(normalContext.calls.some(call => call[0] === 'clip' && call[1] === 'evenodd'));
+  assert.ok(normalContext.calls.some(call => call[0] === 'stroke'));
+  const maskContext = mockCanvasContext();
+  renderFrame(maskContext, project, 1, { mode: 'mask', onion: false });
+  assert.ok(!maskContext.calls.some(call => call[0] === 'clip'));
+  assert.ok(maskContext.calls.some(call => call[0] === 'setLineDash'));
+});
+
+test('renderer supports filled ellipse geometry', () => {
+  const project = freshProject();
+  project.l[0].d[1] = [{ c: '#111111', w: 2, shape: 'ellipse', p: [[10, 10], [70, 50]], fill: true, fillColor: '#f08a28' }];
+  const context = mockCanvasContext();
+  renderFrame(context, project, 1, { mode: 'draw', onion: false });
+  assert.ok(context.calls.some(call => call[0] === 'ellipse'));
+  assert.ok(context.calls.some(call => call[0] === 'fill'));
 });
 
 test('normalizer clamps unusable layer indices and keyframe values safely', () => {
