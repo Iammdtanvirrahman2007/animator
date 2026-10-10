@@ -269,8 +269,8 @@ function inverseCameraPoint(point) {
 }
 function beginCameraGesture(event) {
   const action = tool === 'cameraRotate' ? 'rotate' : tool === 'cameraZoom' ? 'zoom' : 'move';
-  takeSnapshot();
-  cameraGesture = { action, x: event.clientX, y: event.clientY, original: { ...project.camera } };
+  const start = canvasCoordinates(event);
+  cameraGesture = { action, x: start[0], y: start[1], original: { ...project.camera }, snapshotted: false };
   pointer = { camera: true };
 }
 function pointerDown(event) {
@@ -320,10 +320,10 @@ function pointerDown(event) {
       if (mode === 'edit' || tool === 'point') {
         const index = nearestPoint(hit, point[0], point[1]);
         selectedPoint = index;
-        if (index >= 0) { takeSnapshot(); pointer = { type: 'point', stroke: hit, index, last: point }; }
+        if (index >= 0) pointer = { type: 'point', stroke: hit, index, last: point, snapshotted: false };
         else pointer = { type: 'select', start: point };
       } else {
-        takeSnapshot(); pointer = { type: 'move-stroke', stroke: hit, last: point };
+        pointer = { type: 'move-stroke', stroke: hit, last: point, snapshotted: false };
       }
       render(); return;
     }
@@ -354,7 +354,9 @@ function pointerMove(event) {
     pointer.x = event.clientX; pointer.y = event.clientY; return;
   }
   if (cameraGesture) {
-    const dx = event.clientX - cameraGesture.x, dy = event.clientY - cameraGesture.y, original = cameraGesture.original;
+    const point = canvasCoordinates(event);
+    const dx = point[0] - cameraGesture.x, dy = point[1] - cameraGesture.y, original = cameraGesture.original;
+    if (!cameraGesture.snapshotted && (dx || dy)) { takeSnapshot(); cameraGesture.snapshotted = true; }
     if (cameraGesture.action === 'move') { project.camera.x = original.x - dx / project.camera.zoom; project.camera.y = original.y - dy / project.camera.zoom; }
     else if (cameraGesture.action === 'rotate') project.camera.r = original.r + dx * 0.35;
     else project.camera.zoom = clampN(original.zoom * Math.exp(-dy * 0.008), 0.05, 8);
@@ -380,11 +382,22 @@ function pointerMove(event) {
   if (!pointer) return;
   if (pointer.type === 'move-stroke') {
     const dx = point[0] - pointer.last[0], dy = point[1] - pointer.last[1];
-    for (const p of pointer.stroke.p) { p[0] += dx; p[1] += dy; }
-    pointer.last = point; render(); return;
+    if ((dx || dy) && !pointer.snapshotted) { takeSnapshot(); pointer.snapshotted = true; }
+    if (dx || dy) {
+      for (const p of pointer.stroke.p) { p[0] += dx; p[1] += dy; }
+      pointer.last = point;
+      render();
+    }
+    return;
   }
   if (pointer.type === 'point') {
-    pointer.stroke.p[pointer.index] = point; render(); return;
+    const current = pointer.stroke.p[pointer.index];
+    if (current && (current[0] !== point[0] || current[1] !== point[1])) {
+      if (!pointer.snapshotted) { takeSnapshot(); pointer.snapshotted = true; }
+      pointer.stroke.p[pointer.index] = point;
+      render();
+    }
+    return;
   }
   if (pointer.type === 'draw') {
     if (pointer.tool === 'pencil') {
