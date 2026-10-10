@@ -256,11 +256,11 @@ function snap(){hist.push(JSON.stringify(S));if(hist.length>80)hist.shift();fut=
 function undo(){if(!hist.length)return;fut.push(JSON.stringify(S));const f=S.f;S=JSON.parse(hist.pop());S.f=cl(f,S.a,S.b);ui(1)}
 function redo(){if(!fut.length)return;hist.push(JSON.stringify(S));const f=S.f;S=JSON.parse(fut.pop());S.f=cl(f,S.a,S.b);ui(1)}
 vp.onpointerdown=e=>{vp.setPointerCapture(e.pointerId);
- if(mode==='grease'&&window.GreasePencil3D?.pointerDown){const handled=window.GreasePencil3D.pointerDown({S,snap,render:R,ui,col,sz,fl,tool,get md(){return md},set md(v){md=v}},e);if(handled)return}
+ if(mode==='grease'&&window.GreasePencil3D?.pointerDown){const handled=window.GreasePencil3D.pointerDown({S,snap,render:R,ui,col,sz,fl,msg,get tool(){return tool},set tool(v){tool=v},get md(){return md},set md(v){md=v}},e);if(handled)return}
  if(mode==='camera'&&window.KeyframeModes?.camera?.pointerDown){
   const handled=window.KeyframeModes.camera.pointerDown({
    camera:S.camera,
-   screen:e=>[e.clientX,e.clientY],
+   screen:e=>pt(e),
    get md(){return md},set md(v){md=v},
    render:R,ui,snap
   },e);
@@ -295,7 +295,7 @@ vp.onpointerdown=e=>{vp.setPointerCapture(e.pointerId);
  if(!(f in L.d))L.d[f]=ad.checked?clone(dr(L,f)):[];
  const a=loc(L,f,p[0],p[1]),s={c:col.value,w:+sz.value/ev(L,f).s,f:fl.checked,p:[a]};L.d[f].push(s);md={t:tool,s,L,f,a,before};R()};
 vp.onpointermove=e=>{const p=pt(e);ms=p;
- if(mode==='grease'&&window.GreasePencil3D?.pointerMove){const handled=window.GreasePencil3D.pointerMove({S,render:R,ui,tool,get md(){return md},set md(v){md=v}},e);if(handled)return}
+ if(mode==='grease'&&window.GreasePencil3D?.pointerMove){const handled=window.GreasePencil3D.pointerMove({S,snap,render:R,ui,col,sz,fl,msg,get tool(){return tool},set tool(v){tool=v},get md(){return md},set md(v){md=v}},e);if(handled)return}
  if(mode==='camera'&&window.KeyframeModes?.camera?.pointerMove){
   const handled=window.KeyframeModes.camera.pointerMove({camera:S.camera,screen:e=>[e.clientX,e.clientY],get md(){return md},set md(v){md=v},render:R,ui},e);
   if(handled)return;
@@ -324,7 +324,7 @@ vp.onpointermove=e=>{const p=pt(e);ms=p;
  if(md.t=='pendingRotate'){const q=loc(md.L,pendingShape.f,p[0],p[1]),a=Math.atan2(q[1]-md.cy,q[0]-md.cx)-md.start,c=Math.cos(a),s=Math.sin(a);pendingShape.s.p=md.s.map(v=>[md.cx+(v[0]-md.cx)*c-(v[1]-md.cy)*s,md.cy+(v[0]-md.cx)*s+(v[1]-md.cy)*c]);R();return}
  const{s,L,f,a}=md,b=loc(L,f,p[0],p[1]);
  if(md.t=='draw'){const q=s.p[s.p.length-1];if(Math.hypot(b[0]-q[0],b[1]-q[1])>1.5)s.p.push(b)}else s.p=shape(md.t,a,b);R()};
-vp.onpointerup=e=>{if(mode==='grease'&&window.GreasePencil3D?.pointerUp){const handled=window.GreasePencil3D.pointerUp({S,render:R,ui,tool,get md(){return md},set md(v){md=v}},e);if(handled)return}
+vp.onpointerup=e=>{if(mode==='grease'&&window.GreasePencil3D?.pointerUp){const handled=window.GreasePencil3D.pointerUp({S,snap,render:R,ui,col,sz,fl,msg,get tool(){return tool},set tool(v){tool=v},get md(){return md},set md(v){md=v}},e);if(handled)return}
  if(mode==='camera'&&window.KeyframeModes?.camera?.pointerUp){
  const handled=window.KeyframeModes.camera.pointerUp({camera:S.camera,get md(){return md},set md(v){md=v},ui},null);
  if(handled)return
@@ -461,7 +461,8 @@ async function mp4(){
    };
    wait();
   });
-  if(rc===m){m.stop();await stopped}
+  if(m.state!=='inactive')m.stop();
+  await stopped;
   rc=0;playing=false;ui();
   if(!ch.length)throw new Error('No video frames were recorded');
   const webm=new Blob(ch,{type:'video/webm'});
@@ -473,10 +474,6 @@ async function mp4(){
   await ff.deleteFile('animation.mp4').catch(()=>{});
   const mp4Blob=new Blob([data.buffer],{type:'video/mp4'});
   await save('animation.mp4',mp4Blob);
-  const url=URL.createObjectURL(mp4Blob);
-  const a=document.createElement('a');a.href=url;a.download='animation.mp4';a.style.display='none';
-  document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),10000);
   msg('MP4 export complete');
  }catch(e){
   rc=0;playing=false;S.f=oldFrame;ui();
@@ -569,11 +566,16 @@ addEventListener('keydown',e=>{const T=e.target;if(/^(SELECT|TEXTAREA)$/.test(T.
  const k=e.key.toLowerCase(),c=e.ctrlKey||e.metaKey,L=S.l[S.i];
  if(pendingShape){if(k=='enter'){hist.push(pendingShape.before);if(hist.length>80)hist.shift();fut=[];pendingShape=null;vp.classList.remove('cursor-grab','cursor-grabbing','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');ui();msg('Shape confirmed')}else if(k=='escape'){S=JSON.parse(pendingShape.before);pendingShape=null;vp.classList.remove('cursor-grab','cursor-grabbing','cursor-scale','cursor-nesw','cursor-ew','cursor-ns','cursor-rotate');ui(1);msg('Shape cancelled')}else if(['arrowleft','arrowright','arrowup','arrowdown'].includes(k)){const dx=k=='arrowleft'?-1:k=='arrowright'?1:0,dy=k=='arrowup'?-1:k=='arrowdown'?1:0,step=e.shiftKey?10:1;for(const p of pendingShape.s.p){p[0]+=dx*step;p[1]+=dy*step}R();e.preventDefault()}else if(k==']'||k=='+'||k=='='){scalePending(1.1);e.preventDefault()}else if(k=='['||k=='-'){scalePending(1/1.1);e.preventDefault()}else e.preventDefault();return}
  if(mo){if(k=='escape')cancelMo();else if(k=='enter')endMo();else if((k=='x'||k=='y')&&mo.m=='g'){mo.ax=mo.ax==k?null:k;mv(ms)}return}
- if(k==='tab'){e.preventDefault();const order=['object','draw','edit','animate','camera','mask','grease'];setMode(order[(order.indexOf(mode)+1)%order.length]);return}
- if(mode==='grease'&&window.GreasePencil3D?.keydown){if(window.GreasePencil3D.keydown({S,render:R,ui},e))return}
+ const modeCtx={S,camera:S.camera,snap,render:R,ui,msg,col,sz,fl,
+  get tool(){return tool},set tool(v){tool=v},
+  get md(){return md},set md(v){md=v},
+  cancelSnap(){if(hist.length)hist.pop()}
+ };
+ if(mode==='grease'&&window.GreasePencil3D?.keydown){if(window.GreasePencil3D.keydown(modeCtx,e)){e.preventDefault();return}}
  if(mode==='camera'&&window.KeyframeModes?.camera?.keydown){
-  if(window.KeyframeModes.camera.keydown({camera:S.camera,get md(){return md},set md(v){md=v},render:R,ui},e))return;
+  if(window.KeyframeModes.camera.keydown(modeCtx,e)){e.preventDefault();return}
  }
+ if(k==='tab'){e.preventDefault();const order=['object','draw','edit','animate','camera','mask','grease'];setMode(order[(order.indexOf(mode)+1)%order.length]);return}
  if(c&&k=='s'){e.preventDefault();bs.click();return}if(c&&k=='o'){e.preventDefault();bo.click();return}if(c&&k=='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(c&&k=='y'){e.preventDefault();redo();return}
  if(c&&k=='c'){e.preventDefault();copyFrames();return}if(c&&k=='v'){e.preventDefault();pasteFrames();return}if(c&&k=='d'){e.preventDefault();duplicateFrames();return}if(c)return;
  const TK={v:'select',d:'draw',e:'erase',l:'line',b:'box',o:'oval',p:'pivot'};if(TK[k]&&!e.shiftKey){tool=TK[k];if(['draw','erase','line','box','oval'].includes(tool)&&mode==='object')setMode('draw');else ui();return}
