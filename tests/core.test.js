@@ -6,6 +6,7 @@ import {
 } from '../src/core/model.js';
 import { createHistory } from '../src/core/history.js';
 import { hitStroke, nearestPoint, renderFrame } from '../src/core/renderer.js';
+import { createTimelineClickGuard, shouldSuppressTimelineClick } from '../src/core/timeline.js';
 
 test('new project creates a valid starter layer and frame range', () => {
   const project = freshProject();
@@ -140,4 +141,14 @@ test('normalizer clamps unusable layer indices and keyframe values safely', () =
   assert.equal(project.i, 0);
   assert.equal(project.l[0].n, 'Layer 1');
   assert.equal(project.l[0].v, 0);
+});
+
+
+test('timeline click guard blocks only the synthetic click near a drag release', () => {
+  const guard = createTimelineClickGuard(240, 120, 1000);
+  assert.equal(shouldSuppressTimelineClick(guard, 242, 119, 1100), true);
+  assert.equal(shouldSuppressTimelineClick(guard, 260, 120, 1100), false);
+  assert.equal(shouldSuppressTimelineClick(guard, 240, 120, 1500), false);
+  assert.equal(shouldSuppressTimelineClick(guard, 240, 120, 900), false);
+  assert.equal(shouldSuppressTimelineClick(null, 240, 120, 1100), false);
 });
