@@ -96,6 +96,19 @@ export function drawingFrames(layer) {
   return sortedFrames(layer.d);
 }
 
+export function moveFrameKeys(layer, fromFrame, toFrame) {
+  const from = Math.round(Number(fromFrame)), to = Math.round(Number(toFrame));
+  if (!layer || !Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < 1 || from === to) return false;
+  const hasDrawing = Object.prototype.hasOwnProperty.call(layer.d || {}, String(from));
+  const hasTransform = Object.prototype.hasOwnProperty.call(layer.k || {}, String(from));
+  if (!hasDrawing && !hasTransform) return false;
+  if (hasDrawing && Object.prototype.hasOwnProperty.call(layer.d, String(to))) return false;
+  if (hasTransform && Object.prototype.hasOwnProperty.call(layer.k, String(to))) return false;
+  if (hasDrawing) { layer.d[to] = layer.d[from]; delete layer.d[from]; }
+  if (hasTransform) { layer.k[to] = layer.k[from]; delete layer.k[from]; }
+  return true;
+}
+
 export function allFrames(project, layerIndex) {
   const layer = project.l[layerIndex];
   if (!layer) return [];
