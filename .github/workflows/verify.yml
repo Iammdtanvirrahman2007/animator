@@ -32,18 +32,16 @@ jobs:
             node --check "$file"
           done
 
-      - name: Check inline application script syntax
+      - name: Verify HTML module entrypoint and stylesheet
         shell: bash
         run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const html = fs.readFileSync('index.html', 'utf8');
-          const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
-            .filter(([, attrs, source]) => !/\bsrc\s*=/.test(attrs) && source.trim());
-          if (!scripts.length) throw new Error('No inline application script found in index.html');
-          for (const [, , source] of scripts) new Function(source);
-          console.log(`Syntax-checked ${scripts.length} inline application script(s).`);
-          NODE
+          test -f styles.css
+          grep -F '<script type="module" src="./src/main.js"></script>' index.html
+          grep -F '<link rel="stylesheet" href="./styles.css">' index.html
+          grep -F "import './app.js';" src/main.js
+
+      - name: Run core regression tests
+        run: node --experimental-default-type=module --test tests/*.test.js
 
       - name: Smoke-test editor mode controls
         shell: bash
