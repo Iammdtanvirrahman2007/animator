@@ -1,4 +1,5 @@
 import { freshProject, normalizeProject, clone, clamp, WIDTH, HEIGHT, drawingAt, sortedFrames, transformAt, captureTransform, keyframeAt, exposedFrame, moveFrameKeys } from './core/model.js';
+import { createTimelineClickGuard, shouldSuppressTimelineClick } from './core/timeline.js';
 import { createHistory } from './core/history.js';
 import { renderFrame, pointFromEvent, hitStroke, nearestPoint } from './core/renderer.js';
 import { exportPNG, exportWebM, exportMP4 } from './core/export.js';
@@ -29,7 +30,7 @@ let pointer = null;
 let preview = null;
 let playing = false;
 let timelineDrag = null;
-let timelineDidMove = false;
+let timelineClickGuard = null;
 let playRequest = 0;
 let lastTick = 0;
 let lastAutosave = 0;
@@ -559,11 +560,33 @@ async function runExport(kind) {
   finally { project.f = before; render(); }
 }
 function insertTimelineKey(event) {
-  if (timelineDidMove) { timelineDidMove = false; event.preventDefault(); return; }
+  if (timelineClickGuard) {
+    const guard = timelineClickGuard;
+    timelineClickGuard = null;
+    if (shouldSuppressTimelineClick(guard, event.clientX, event.clientY)) {
+      event.preventDefault(); event.stopPropagation(); return;
+    }
+  }
   const target = event.target.closest('[data-frame]');
   if (!target) return;
   if (target.dataset.track != null) selectLayer(Number(target.dataset.track));
   setFrame(Number(target.dataset.frame));
+}
+function clearTimelineDragFeedback() {
+  document.querySelectorAll('.timeline-drag-target').forEach(node => node.classList.remove('timeline-drag-target'));
+}
+function armTimelineClickGuard(event) {
+  const guard = createTimelineClickGuard(event.clientX, event.clientY);
+  timelineClickGuard = guard;
+  setTimeout(() => { if (timelineClickGuard === guard) timelineClickGuard = null; }, 460);
+}
+function cancelTimelineDrag(event) {
+  if (!timelineDrag) { clearTimelineDragFeedback(); return; }
+  if (event?.pointerId != null && timelineDrag.pointerId !== event.pointerId) return;
+  timelineDrag = null;
+  timelineClickGuard = null;
+  clearTimelineDragFeedback();
+  status('Timeline drag cancelled');
 }
 function timelinePointerDown(event) {
   if (event.button !== 0) return;
@@ -572,8 +595,9 @@ function timelinePointerDown(event) {
   const layerIndex = Number(cell.dataset.track), frame = Number(cell.dataset.frame);
   const layer = project.l[layerIndex];
   if (!layer || (!Object.prototype.hasOwnProperty.call(layer.d, String(frame)) && !Object.prototype.hasOwnProperty.call(layer.k, String(frame)))) return;
+  timelineClickGuard = null;
+  clearTimelineDragFeedback();
   timelineDrag = { layerIndex, fromFrame: frame, toFrame: frame, pointerId: event.pointerId, startX: event.clientX, moved: false };
-  timelineDidMove = false;
   try { $('timeline-content').setPointerCapture(event.pointerId); } catch (error) {}
 }
 function timelinePointerMove(event) {
@@ -584,7 +608,6 @@ function timelinePointerMove(event) {
   timelineDrag.toFrame = Number(cell.dataset.frame);
   if (timelineDrag.toFrame !== timelineDrag.fromFrame && Math.abs(event.clientX - timelineDrag.startX) > 3) {
     timelineDrag.moved = true;
-    timelineDidMove = true;
     cell.classList.add('timeline-drag-target');
   }
 }
@@ -592,9 +615,14 @@ function timelinePointerUp(event) {
   if (!timelineDrag || timelineDrag.pointerId !== event.pointerId) return;
   const drag = timelineDrag;
   const cell = document.elementFromPoint(event.clientX, event.clientY)?.closest('.track-cell[data-track][data-frame]');
-  document.querySelectorAll('.timeline-drag-target').forEach(node => node.classList.remove('timeline-drag-target'));
   timelineDrag = null;
-  if (!drag.moved || !cell || Number(cell.dataset.track) !== drag.layerIndex) return;
+  clearTimelineDragFeedback();
+  if (!drag.moved) return;
+  armTimelineClickGuard(event);
+  if (!cell || Number(cell.dataset.track) !== drag.layerIndex) {
+    status('Timeline key move cancelled. Drop on a frame in the same layer.');
+    return;
+  }
   const toFrame = Number(cell.dataset.frame), layer = project.l[drag.layerIndex];
   if (!layer || toFrame === drag.fromFrame) return;
   const movingDrawing = Object.prototype.hasOwnProperty.call(layer.d, String(drag.fromFrame));
@@ -631,8 +659,11 @@ function attachEvents() {
   $('timeline-content').addEventListener('pointerdown', timelinePointerDown);
   $('timeline-content').addEventListener('pointermove', timelinePointerMove);
   $('timeline-content').addEventListener('pointerup', timelinePointerUp);
-  $('timeline-content').addEventListener('pointercancel', () => { timelineDrag = null; });
+  $('timeline-content').addEventListener('pointercancel', cancelTimelineDrag);
+  $('timeline-content').addEventListener('lostpointercapture', cancelTimelineDrag);
   $('timeline-content').addEventListener('click', insertTimelineKey);
+  window.addEventListener('pointerup', timelinePointerUp);
+  window.addEventListener('pointercancel', cancelTimelineDrag);
   $('new-btn').addEventListener('click', newProject);
   $('save-btn').addEventListener('click', saveJSON);
   $('open-btn').addEventListener('click', () => $('file-input').click());
