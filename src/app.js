@@ -59,18 +59,27 @@ function status(message, temporary = true) {
   clearTimeout(statusTimer);
   if (temporary) statusTimer = setTimeout(() => { $('status-text').textContent = dirty ? 'Unsaved changes' : 'Ready'; }, 4200);
 }
-function markDirty() {
-  dirty = true;
+function scheduleAutosave() {
+  if (!dirty) return;
   $('save-indicator').textContent = '●';
   clearTimeout(lastAutosave);
   lastAutosave = setTimeout(() => {
-    try { localStorage.setItem('keyframe.project.v4', JSON.stringify(project)); dirty = false; $('save-indicator').textContent = '✓'; }
-    catch (error) { status('Browser storage is full. Save the project JSON to keep your work.'); }
+    try {
+      localStorage.setItem('keyframe.project.v4', JSON.stringify(project));
+      dirty = false;
+      $('save-indicator').textContent = '✓';
+    } catch (error) {
+      status('Browser storage is full. Save the project JSON to keep your work.');
+    }
   }, 500);
+}
+function markDirty() {
+  dirty = true;
+  scheduleAutosave();
 }
 function takeSnapshot() {
   history.snapshot();
-  dirty = true;
+  markDirty();
   updateHistoryButtons();
 }
 function updateHistoryButtons() {
@@ -94,7 +103,7 @@ function render() {
   renderLayers();
   renderProperties();
   updateHistoryButtons();
-  markDirty();
+  scheduleAutosave();
 }
 function renderProperties() {
   const layer = activeLayer();
