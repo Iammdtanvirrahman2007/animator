@@ -45,6 +45,79 @@ jobs:
           console.log(`Syntax-checked ${scripts.length} inline application script(s).`);
           NODE
 
+      - name: Smoke-test editor mode controls
+        shell: bash
+        run: |
+          node --experimental-default-type=module --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { cameraMode } from './src/modes/camera-mode.js';
+
+          let md = null, snapshots = 0, cancelled = 0;
+          const camera = { x: 480, y: 270, zoom: 1, r: 0, view: true };
+          const ctx = {
+            camera,
+            screen: e => [e.x, e.y],
+            get md() { return md; },
+            set md(value) { md = value; },
+            snap() { snapshots++; },
+            cancelSnap() { cancelled++; },
+            render() {},
+            ui() {},
+          };
+
+          assert.equal(cameraMode.keydown(ctx, { key: 'g' }), true);
+          cameraMode.pointerMove(ctx, { x: 100, y: 100 });
+          cameraMode.pointerMove(ctx, { x: 120, y: 110 });
+          assert.deepEqual([camera.x, camera.y], [460, 260], 'G should move the camera');
+          assert.equal(cameraMode.pointerUp(ctx), true);
+
+          assert.equal(cameraMode.keydown(ctx, { key: 'r' }), true);
+          cameraMode.pointerMove(ctx, { x: 100, y: 100 });
+          cameraMode.pointerMove(ctx, { x: 120, y: 100 });
+          assert.equal(camera.r, 10, 'R should rotate the camera');
+          assert.equal(cameraMode.keydown(ctx, { key: 'escape' }), true);
+          assert.equal(camera.r, 0, 'Escape should restore the original rotation');
+          assert.equal(cancelled, 1, 'Cancelled transforms should discard their history entry');
+
+          assert.equal(cameraMode.keydown(ctx, { key: 's' }), true);
+          cameraMode.pointerMove(ctx, { x: 100, y: 100 });
+          cameraMode.pointerMove(ctx, { x: 100, y: 110 });
+          assert.ok(camera.zoom < 1 && camera.zoom > 0.8, 'S should zoom the camera');
+          assert.equal(cameraMode.pointerUp(ctx), true);
+
+          const beforePan = [camera.x, camera.y];
+          cameraMode.pointerDown(ctx, { button: 0, x: 50, y: 50 });
+          cameraMode.pointerMove(ctx, { x: 60, y: 70 });
+          assert.notDeepEqual([camera.x, camera.y], beforePan, 'Dragging should pan the camera');
+          assert.equal(cameraMode.pointerUp(ctx), true);
+          assert.ok(snapshots >= 3, 'Camera edits should create undo snapshots');
+
+          globalThis.window = {};
+          const { greasePencilMode } = await import('./src/modes/grease-pencil-mode.js');
+          let tool = 'select', gpMd = null;
+          const project = {
+            a: 1, b: 48, f: 1, i: 0,
+            l: [{ n: 'Layer 1', v: 1, gpZ: 0, d: {}, k: {}, bm: 'source-over', e: 'ease', px: 480, py: 270 }],
+            gp3d: {
+              yaw: 0.35, pitch: -0.22, distance: 900, target: [0, 0, 0],
+              focal: 720, grid: 80,
+              sceneCamera: { position: [0, 0, 720], target: [0, 0, 0], lens: 50, show: true, view: false, selected: false },
+            },
+          };
+          const gpCtx = {
+            S: project, snap() {}, render() {}, ui() {}, msg() {},
+            get tool() { return tool; }, set tool(value) { tool = value; },
+            get md() { return gpMd; }, set md(value) { gpMd = value; },
+          };
+          greasePencilMode.enter(gpCtx);
+          assert.equal(greasePencilMode.keydown(gpCtx, { key: 'c' }), true);
+          assert.equal(tool, 'cameraPath', 'C should switch the active 3D tool to Camera Path');
+          assert.equal(greasePencilMode.keydown(gpCtx, { key: 'Tab' }), true);
+          assert.equal(greasePencilMode.keydown(gpCtx, { key: 'p' }), true);
+          assert.equal(project.gp3d.pageVisible, false, 'P should persist page visibility');
+          console.log('Passed Camera Mode and Grease Pencil shortcut smoke tests.');
+          NODE
+
       - name: Check index.html exists
         run: test -f index.html
 
