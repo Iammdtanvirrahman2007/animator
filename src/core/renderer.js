@@ -173,8 +173,10 @@ export function renderFrame(ctx, project, frame, options = {}) {
     const count = clamp(Number(project.on) || 0, 0, 5);
     for (const layer of project.l) {
       const frames = sortedFrames(layer.d);
-      const previous = frames.filter(value => value < frame).reverse().slice(0, count);
-      const next = frames.filter(value => value > frame).slice(0, count);
+      const currentExposure = frames.filter(value => value <= frame).pop();
+      const anchor = currentExposure ?? frame;
+      const previous = frames.filter(value => value < anchor).reverse().slice(0, count);
+      const next = frames.filter(value => value > anchor).slice(0, count);
       previous.forEach((value, index) => paintLayer(ctx, layer, value, 0.32 / (index + 1), '#df6161'));
       next.forEach((value, index) => paintLayer(ctx, layer, value, 0.32 / (index + 1), '#42a77c'));
     }
