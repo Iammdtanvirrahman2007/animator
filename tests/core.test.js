@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   freshProject, normalizeProject, exposedFrame, drawingAt, transformAt,
-  captureTransform, keyframeAt, allFrames, drawingFrames
+  captureTransform, keyframeAt, allFrames, drawingFrames, moveFrameKeys
 } from '../src/core/model.js';
 import { createHistory } from '../src/core/history.js';
 import { hitStroke, nearestPoint, renderFrame } from '../src/core/renderer.js';
@@ -79,6 +79,37 @@ function mockCanvasContext() {
   for (const method of methods) context[method] = (...args) => calls.push([method, ...args]);
   return context;
 }
+
+
+test('timeline retiming moves exposures and transform keys together', () => {
+  const layer = { d: { 2: [{ p: [[1, 1]] }] }, k: { 2: { x: 10 }, 8: { x: 20 } } };
+  assert.equal(moveFrameKeys(layer, 2, 5), true);
+  assert.equal(layer.d[2], undefined);
+  assert.deepEqual(layer.d[5], [{ p: [[1, 1]] }]);
+  assert.deepEqual(layer.k[5], { x: 10 });
+  assert.deepEqual(layer.k[8], { x: 20 });
+});
+
+test('timeline retiming rejects collisions without destroying keys', () => {
+  const layer = { d: { 2: [{ id: 'source' }], 5: [{ id: 'target' }] }, k: { 2: { x: 1 } } };
+  assert.equal(moveFrameKeys(layer, 2, 5), false);
+  assert.deepEqual(layer.d[2], [{ id: 'source' }]);
+  assert.deepEqual(layer.d[5], [{ id: 'target' }]);
+  assert.deepEqual(layer.k[2], { x: 1 });
+  assert.equal(moveFrameKeys(layer, 2, 2), false);
+  assert.equal(moveFrameKeys(layer, 0, 7), false);
+});
+
+test('cancelled snapshot can be discarded without creating a redo entry', () => {
+  let project = freshProject();
+  const history = createHistory(() => project, value => { project = value; });
+  history.snapshot();
+  project.l[0].n = 'Cancelled preview';
+  history.discardLatestSnapshot();
+  project.l[0].n = 'Layer 1';
+  assert.equal(history.canUndo, false);
+  assert.equal(history.canRedo, false);
+});
 
 test('renderer paints strokes and clips masked regions outside mask mode', () => {
   const project = freshProject();
