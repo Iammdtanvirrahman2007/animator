@@ -330,12 +330,14 @@ function pointerDown(event) {
     selectedStroke = null; selectedPoint = -1;
     if (tool === 'select' || mode === 'object' || mode === 'animate' || mode === 'edit') { render(); return; }
   }
-  takeSnapshot();
   if (tool === 'erase') {
     const hit = hitStroke(strokes, point[0], point[1], 16);
-    if (hit) { layer.d[project.f] = strokes.filter(stroke => stroke !== hit); selectedStroke = null; render(); }
-    pointer = { type: 'erase' }; return;
+    if (hit) {
+      takeSnapshot(); layer.d[project.f] = strokes.filter(stroke => stroke !== hit); selectedStroke = null; render();
+    }
+    pointer = { type: 'erase', snapshotted: !!hit }; return;
   }
+  takeSnapshot();
   const shape = createShape(tool, point, point);
   const stroke = { c: colorInput.value || '#202020', w: Number(widthInput.value) || 4, fill: !!fillInput.checked, fillColor: fillColorInput.value || colorInput.value || '#202020', p: shape.p, shape: shape.shape, closed: shape.closed };
   if (mode === 'mask') return;
@@ -360,6 +362,7 @@ function pointerMove(event) {
     if (cameraGesture.action === 'move') { project.camera.x = original.x - dx / project.camera.zoom; project.camera.y = original.y - dy / project.camera.zoom; }
     else if (cameraGesture.action === 'rotate') project.camera.r = original.r + dx * 0.35;
     else project.camera.zoom = clampN(original.zoom * Math.exp(-dy * 0.008), 0.05, 8);
+    if (dx || dy) markDirty();
     render(); return;
   }
   const point = inverseCameraPoint(canvasCoordinates(event));
@@ -377,7 +380,7 @@ function pointerMove(event) {
       const factor = clampN(distance / objectTransform.startDistance, 0.02, 50);
       objectTransform.stroke.p = source.map(p => [center[0] + (p[0] - center[0]) * factor, center[1] + (p[1] - center[1]) * factor]);
     }
-    render(); return;
+    markDirty(); render(); return;
   }
   if (!pointer) return;
   if (pointer.type === 'move-stroke') {
@@ -386,7 +389,7 @@ function pointerMove(event) {
     if (dx || dy) {
       for (const p of pointer.stroke.p) { p[0] += dx; p[1] += dy; }
       pointer.last = point;
-      render();
+      markDirty(); render();
     }
     return;
   }
@@ -395,7 +398,7 @@ function pointerMove(event) {
     if (current && (current[0] !== point[0] || current[1] !== point[1])) {
       if (!pointer.snapshotted) { takeSnapshot(); pointer.snapshotted = true; }
       pointer.stroke.p[pointer.index] = point;
-      render();
+      markDirty(); render();
     }
     return;
   }
@@ -407,7 +410,7 @@ function pointerMove(event) {
       const shape = createShape(pointer.tool, pointer.start, point);
       pointer.stroke.p = shape.p;
     }
-    render(); return;
+    markDirty(); render(); return;
   }
   if (pointer.type === 'mask') {
     if (tool === 'pencil') {
@@ -418,19 +421,23 @@ function pointerMove(event) {
       maskDraft.draft.p = shape.p;
       if (shape.shape !== 'path') maskDraft.draft.shape = shape.shape;
     }
-    render(); return;
+    markDirty(); render(); return;
   }
   if (pointer.type === 'mask-erase') {
     const masks = project.masks[project.f] || [], hit = hitStroke(masks, point[0], point[1], 16);
     if (hit) {
       if (!pointer.snapshotted) { takeSnapshot(); pointer.snapshotted = true; }
-      project.masks[project.f] = masks.filter(mask => mask !== hit); render();
+      project.masks[project.f] = masks.filter(mask => mask !== hit); markDirty(); render();
     }
     return;
   }
   if (pointer.type === 'erase') {
     const layer = activeLayer(), strokes = layer.d[project.f] || [], hit = hitStroke(strokes, point[0], point[1], 16);
-    if (hit) { layer.d[project.f] = strokes.filter(stroke => stroke !== hit); render(); }
+    if (hit) {
+      if (!pointer.snapshotted) { takeSnapshot(); pointer.snapshotted = true; }
+      layer.d[project.f] = strokes.filter(stroke => stroke !== hit);
+      markDirty(); render();
+    }
   }
 }
 function pointerUp(event) {
